@@ -1,3 +1,30 @@
+/**
+ * Board.tsx — Interactive Checkers Board with Drag-and-Drop
+ * ==========================================================
+ * Renders the 8×8 checkers board and handles all move logic.
+ *
+ * Component hierarchy:
+ *   Board (main) → DroppableSquare (64 cells) → DraggablePiece (where pieces exist)
+ *
+ * Play modes (determined by which model IDs are non-null):
+ *   - Human vs Human:  Both sides draggable, no AI moves
+ *   - Human vs AI:     One side draggable, AI auto-moves on its turn
+ *   - AI vs AI:        No pieces draggable, both sides auto-move with 500ms delay
+ *
+ * AI inference pipeline:
+ *   1. useEffect fires when currentTurn changes and belongs to an AI side
+ *   2. POST /api/infer with board state, model_id, and epsilon
+ *   3. Response contains the best move and CNN win probabilities
+ *   4. Move is applied to the grid with a 500ms delay for visibility
+ *   5. Turn switches, triggering the next AI's move (if AI vs AI)
+ *
+ * Human move pipeline:
+ *   1. Player drags a piece (DraggablePiece) to a target (DroppableSquare)
+ *   2. POST /api/validate_move checks legality (including mandatory jumps)
+ *   3. If valid, move is applied locally and turn switches
+ *
+ * Piece constants match the Python backend: EMPTY=0, BLACK=1, WHITE=2, etc.
+ */
 
 import {
     DndContext,
@@ -10,12 +37,12 @@ import {
 } from '@dnd-kit/core';
 import { useEffect, useRef } from 'react';
 
-// Represents standard Python representation
+// Piece constants — must match backend/engine/board.py
 const EMPTY = 0;
-const BLACK = 1;
-const WHITE = 2;
-const BLACK_KING = 3;
-const WHITE_KING = 4;
+const BLACK = 1;      // Regular red piece (called "black" internally)
+const WHITE = 2;      // Regular white piece
+const BLACK_KING = 3; // Promoted red piece (king)
+const WHITE_KING = 4; // Promoted white piece (king)
 
 interface BoardProps {
     grid: number[][];

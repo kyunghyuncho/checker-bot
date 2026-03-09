@@ -1,3 +1,21 @@
+/**
+ * ModelRegistry.tsx — AI Model Arena Panel
+ * ==========================================
+ * Lists all trained models and lets the user assign them to play as Red or White.
+ *
+ * Each model row shows:
+ *   - 🔴 radio button — assign this model to play as Red (player 1)
+ *   - Model metadata (ID, epochs, architecture, loss)
+ *   - ⚪ radio button — assign this model to play as White (player 2)
+ *   - 🗑 delete button
+ *
+ * Selection logic:
+ *   - Click a radio to assign; click again to deselect (toggle behavior)
+ *   - The same model CAN be assigned to both sides (plays itself)
+ *   - A status bar at the bottom shows the current Red/White assignment (AI or Human)
+ *
+ * Refreshes automatically via WebSocket when new models are trained (models_updated event).
+ */
 import { useEffect, useState } from 'react';
 import { Box, Trash2 } from 'lucide-react';
 

@@ -1,3 +1,19 @@
+/**
+ * Metrics.tsx — Live Training Loss Chart
+ * ========================================
+ * Displays a real-time line chart of training and validation loss during
+ * model training.
+ *
+ * Connects to the WebSocket endpoint (ws://localhost:8000/ws/metrics) to
+ * receive epoch-level loss values streamed by the WebSocketMetricsCallback
+ * in the backend. The chart is rendered using Recharts.
+ *
+ * Chart lines:
+ *   - Train Loss (solid purple) — primary training objective
+ *   - Val Loss (dashed blue) — validation set performance for early stopping
+ *
+ * Resets the chart data when a new training run begins (epoch 0).
+ */
 import { useEffect, useState } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { BarChart2 } from 'lucide-react';

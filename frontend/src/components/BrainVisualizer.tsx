@@ -1,3 +1,14 @@
+/**
+ * BrainVisualizer.tsx — CNN Win Probability Display
+ * ===================================================
+ * Displays the Two-Headed CNN's output: P(Red wins) and P(White wins)
+ * as animated horizontal progress bars.
+ *
+ * Receives probabilities from the parent Board/Game component whenever
+ * an AI inference is performed (either AI move or board evaluation).
+ *
+ * When no model is loaded, shows a placeholder message.
+ */
 import React from 'react';
 import { Activity } from 'lucide-react';
 

@@ -1,3 +1,26 @@
+/**
+ * Game.tsx — Main Dashboard Page
+ * ================================
+ * The primary play & train view. Composes three columns:
+ *
+ *   Left column:   ConfigPanel (data gen + training controls)
+ *                   Metrics (live loss chart)
+ *                   ModelRegistry (model arena with Red/White assignment)
+ *
+ *   Center column: Interactive Board (drag-and-drop checkers)
+ *                   Mode label + epsilon slider
+ *                   Turn indicators (Red / White active)
+ *
+ *   Right column:  BrainVisualizer (CNN win probability bars)
+ *                   How to Play rules
+ *
+ * State managed here:
+ *   - boardState / currentTurn: the game grid and whose turn it is
+ *   - blackModelId / whiteModelId: which AI model plays each side (null = human)
+ *   - epsilon: randomness for AI move selection
+ *   - cnnProbabilities: latest CNN output for the brain visualizer
+ *   - gameOver: winner ID when the game ends (null while active)
+ */
 import { useState } from 'react';
 import { Info, RotateCcw } from 'lucide-react';
 import { Board } from '../components/Board';

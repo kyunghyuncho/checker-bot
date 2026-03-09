@@ -1,3 +1,20 @@
+/**
+ * ConfigPanel.tsx — Data Generation & Model Training Controls
+ * =============================================================
+ * Left-column panel with two collapsible sections:
+ *
+ *   1. Data Generation — controls for self-play game generation:
+ *      - num_games, search depth, epsilon (randomness)
+ *      - Triggers POST /api/generate in the background
+ *
+ *   2. Model Training — architecture and optimization hyperparameters:
+ *      - Architecture: conv layers, hidden dims, dropout
+ *      - Optimization: epochs, learning rate, batch size
+ *      - Early stopping: validation split, patience
+ *      - Triggers POST /api/train in the background
+ *
+ * A status bar shows real-time progress received via WebSocket.
+ */
 import { useState, useEffect } from 'react';
 import { Settings, Play, Database, ChevronDown, ChevronRight } from 'lucide-react';
 
