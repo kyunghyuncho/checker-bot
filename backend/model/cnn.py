@@ -3,7 +3,7 @@ import torch.nn as nn
 
 class TwoHeadedCNN(nn.Module):
     """
-    A simple "Two-Headed" Convolutional Neural Network.
+    A "Two-Headed" Convolutional Neural Network with configurable depth.
     
     Input: An 8x8x5 tensor. The 5 channels represent:
       0: Black pieces (1 if black, 0 otherwise)
@@ -11,28 +11,23 @@ class TwoHeadedCNN(nn.Module):
       2: Black Kings (1 if black king, 0 otherwise)
       3: White Kings (1 if white king, 0 otherwise)
       4: Turn indicator (All 1s if Black's turn, all 0s if White's turn)
-      
-    This shallow design allows testing on CPU while still capturing spatial relationships.
     """
-    def __init__(self, channels: int = 5, hidden_dims: int = 64):
+    def __init__(self, channels: int = 5, hidden_dims: int = 64, 
+                 num_conv_layers: int = 2, dropout_rate: float = 0.2):
         super(TwoHeadedCNN, self).__init__()
         
-        # Shared Backbone to extract common spatial Checkers features
-        # e.g., "is there an immediate jump threat?"
-        self.shared_backbone = nn.Sequential(
-            # Conv layer 1: Keep spatial size, extract local patterns
-            nn.Conv2d(in_channels=channels, out_channels=hidden_dims, kernel_size=3, padding=1),
-            nn.BatchNorm2d(hidden_dims),
-            nn.ReLU(),
-            
-            # Conv layer 2: Same logic
-            nn.Conv2d(in_channels=hidden_dims, out_channels=hidden_dims, kernel_size=3, padding=1),
-            nn.BatchNorm2d(hidden_dims),
-            nn.ReLU(),
-            
-            # Flatten 8x8 * hidden_dims into a 1D vector
-            nn.Flatten()
-        )
+        # Dynamically build the shared convolutional backbone
+        layers = []
+        in_ch = channels
+        for _ in range(num_conv_layers):
+            layers.extend([
+                nn.Conv2d(in_channels=in_ch, out_channels=hidden_dims, kernel_size=3, padding=1),
+                nn.BatchNorm2d(hidden_dims),
+                nn.ReLU(),
+            ])
+            in_ch = hidden_dims
+        layers.append(nn.Flatten())
+        self.shared_backbone = nn.Sequential(*layers)
         
         # 8*8 = 64 spatial locations * hidden_dims channels
         flattened_size = 64 * hidden_dims
@@ -41,18 +36,18 @@ class TwoHeadedCNN(nn.Module):
         self.head_black_win = nn.Sequential(
             nn.Linear(flattened_size, 128),
             nn.ReLU(),
-            nn.Dropout(0.2), # Prevent overfitting on synthetic dataset
+            nn.Dropout(dropout_rate),
             nn.Linear(128, 1),
-            nn.Sigmoid() # Bounds prediction between 0 (Loss) and 1 (Win)
+            nn.Sigmoid()
         )
         
         # Head 2: Probability of White Winning (P_white)
         self.head_white_win = nn.Sequential(
             nn.Linear(flattened_size, 128),
             nn.ReLU(),
-            nn.Dropout(0.2),
+            nn.Dropout(dropout_rate),
             nn.Linear(128, 1),
-            nn.Sigmoid() # Bounds prediction between 0 and 1
+            nn.Sigmoid()
         )
         
     def forward(self, x: torch.Tensor):

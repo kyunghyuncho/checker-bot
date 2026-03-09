@@ -47,7 +47,7 @@ const DraggablePiece = ({ id, piece, r, c, isDraggable }: { id: string, piece: n
     let border = 'none';
     if (piece === BLACK || piece === BLACK_KING) {
         bgColor = 'var(--piece-black)';
-        border = `2px solid ${piece === BLACK_KING ? 'gold' : '#334155'}`;
+        border = `2px solid ${piece === BLACK_KING ? 'gold' : '#922b21'}`;
     } else if (piece === WHITE || piece === WHITE_KING) {
         bgColor = 'var(--piece-white)';
         border = `2px solid ${piece === WHITE_KING ? 'gold' : '#cbd5e1'}`;

@@ -5,8 +5,14 @@ export const ConfigPanel = () => {
     const [numGames, setNumGames] = useState(10);
     const [depth, setDepth] = useState(4);
     const [epsilon, setEpsilon] = useState(0.1);
-    const [epochs, setEpochs] = useState(5);
+    const [epochs, setEpochs] = useState(20);
     const [lr, setLr] = useState(0.001);
+    const [hiddenDims, setHiddenDims] = useState(64);
+    const [numConvLayers, setNumConvLayers] = useState(2);
+    const [dropoutRate, setDropoutRate] = useState(0.2);
+    const [batchSize, setBatchSize] = useState(32);
+    const [valSplit, setValSplit] = useState(0.2);
+    const [patience, setPatience] = useState(5);
     const [statusText, setStatusText] = useState<string>('');
     const [errorMsg, setErrorMsg] = useState<string>('');
 
@@ -17,7 +23,6 @@ export const ConfigPanel = () => {
             if (msg.type === 'status') {
                 setStatusText(msg.message);
                 if (msg.message === "Data Generation Complete!" || msg.message === "Training Complete!") {
-                    // Optional: clear status after a few seconds
                     setTimeout(() => setStatusText(''), 3000);
                 }
             } else if (msg.type === 'metric') {
@@ -52,7 +57,16 @@ export const ConfigPanel = () => {
             const response = await fetch('http://localhost:8000/api/train', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ epochs, learning_rate: lr, hidden_dims: 64 })
+                body: JSON.stringify({
+                    epochs,
+                    learning_rate: lr,
+                    hidden_dims: hiddenDims,
+                    num_conv_layers: numConvLayers,
+                    dropout_rate: dropoutRate,
+                    batch_size: batchSize,
+                    val_split: valSplit,
+                    patience
+                })
             });
 
             if (!response.ok) {
@@ -113,14 +127,45 @@ export const ConfigPanel = () => {
                 <h3 style={{ fontSize: '1rem', marginBottom: '0.75rem', color: 'var(--text-secondary)' }}>
                     2. Model Training
                 </h3>
+
+                <h4 style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.5rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Architecture</h4>
                 <div className="input-group">
-                    <label>Epochs <span>{epochs}</span></label>
-                    <input type="range" min="1" max="20" value={epochs} onChange={(e) => setEpochs(Number(e.target.value))} />
+                    <label>Conv Layers <span>{numConvLayers}</span></label>
+                    <input type="range" min="1" max="5" value={numConvLayers} onChange={(e) => setNumConvLayers(Number(e.target.value))} />
+                </div>
+                <div className="input-group">
+                    <label>Hidden Dims <span>{hiddenDims}</span></label>
+                    <input type="range" min="16" max="256" step="16" value={hiddenDims} onChange={(e) => setHiddenDims(Number(e.target.value))} />
+                </div>
+                <div className="input-group">
+                    <label>Dropout Rate <span>{dropoutRate}</span></label>
+                    <input type="range" min="0" max="0.5" step="0.05" value={dropoutRate} onChange={(e) => setDropoutRate(Number(e.target.value))} />
+                </div>
+
+                <h4 style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.5rem', marginTop: '1rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Optimization</h4>
+                <div className="input-group">
+                    <label>Max Epochs <span>{epochs}</span></label>
+                    <input type="range" min="1" max="100" value={epochs} onChange={(e) => setEpochs(Number(e.target.value))} />
                 </div>
                 <div className="input-group">
                     <label>Learning Rate <span>{lr}</span></label>
-                    <input type="number" step="0.001" value={lr} onChange={(e) => setLr(Number(e.target.value))} />
+                    <input type="number" step="0.0001" value={lr} onChange={(e) => setLr(Number(e.target.value))} />
                 </div>
+                <div className="input-group">
+                    <label>Batch Size <span>{batchSize}</span></label>
+                    <input type="range" min="8" max="128" step="8" value={batchSize} onChange={(e) => setBatchSize(Number(e.target.value))} />
+                </div>
+
+                <h4 style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.5rem', marginTop: '1rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Early Stopping</h4>
+                <div className="input-group">
+                    <label>Validation Split <span>{(valSplit * 100).toFixed(0)}%</span></label>
+                    <input type="range" min="0.1" max="0.4" step="0.05" value={valSplit} onChange={(e) => setValSplit(Number(e.target.value))} />
+                </div>
+                <div className="input-group">
+                    <label>Patience <span>{patience}</span></label>
+                    <input type="range" min="0" max="20" value={patience} onChange={(e) => setPatience(Number(e.target.value))} />
+                </div>
+
                 <button className="primary" onClick={handleTrain} style={{ width: '100%', marginTop: '0.5rem', display: 'flex', justifyContent: 'center', gap: '0.5rem', background: 'linear-gradient(135deg, var(--accent-green), #059669)' }}>
                     <Play size={18} /> Start Training
                 </button>

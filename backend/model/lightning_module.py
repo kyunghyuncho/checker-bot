@@ -52,10 +52,14 @@ class CheckersLightningModule(pl.LightningModule):
     PyTorch Lightning wrapper for training the TwoHeadedCNN.
     Handles optimization, training steps, and validation steps.
     """
-    def __init__(self, learning_rate: float = 1e-3, channels: int = 5, hidden_dims: int = 64):
+    def __init__(self, learning_rate: float = 1e-3, channels: int = 5, hidden_dims: int = 64,
+                 num_conv_layers: int = 2, dropout_rate: float = 0.2):
         super().__init__()
         self.save_hyperparameters()
-        self.model = TwoHeadedCNN(channels=channels, hidden_dims=hidden_dims)
+        self.model = TwoHeadedCNN(
+            channels=channels, hidden_dims=hidden_dims,
+            num_conv_layers=num_conv_layers, dropout_rate=dropout_rate
+        )
         self.learning_rate = learning_rate
 
     def forward(self, x):

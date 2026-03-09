@@ -33,7 +33,7 @@ export const BrainVisualizer: React.FC<BrainProps> = ({ probabilities }) => {
                                 width: `${probabilities.p_black * 100}%`,
                                 height: '100%',
                                 backgroundColor: 'var(--piece-black)',
-                                borderRight: '2px solid #334155',
+                                borderRight: '2px solid #922b21',
                                 transition: 'width 0.5s ease-out'
                             }} />
                         </div>

@@ -27,10 +27,11 @@
   /* Board Colors */
   --board-light: #e2e8f0;
   /* Slate 200 */
-  --board-dark: #475569;
-  /* Slate 600 */
-  --piece-black: #1e293b;
-  --piece-white: #f8fafc;
+  --board-dark: #5b6d82;
+  /* Lighter slate for board squares */
+  --piece-black: #c0392b;
+  /* Rich crimson — visible on dark backgrounds */
+  --piece-white: #f1f5f9;
 
   /* Shadows & Glassmorphism */
   --shadow-glow: 0 0 15px rgba(59, 130, 246, 0.5);

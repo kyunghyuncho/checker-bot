@@ -5,7 +5,7 @@ import asyncio
 import json
 import torch
 from pytorch_lightning import Trainer
-from pytorch_lightning.callbacks import Callback
+from pytorch_lightning.callbacks import Callback, EarlyStopping
 
 # Local Imports
 from backend.data.generator import generate_dataset
@@ -41,9 +41,14 @@ class GenerateRequest(BaseModel):
 
 class TrainRequest(BaseModel):
     dataset_file: str = "backend/data/dataset.json"
-    epochs: int = 5
+    epochs: int = 20
     learning_rate: float = 0.001
     hidden_dims: int = 64
+    num_conv_layers: int = 2
+    dropout_rate: float = 0.2
+    batch_size: int = 32
+    val_split: float = 0.2
+    patience: int = 5
 
 class InferRequest(BaseModel):
     # The board grid (8x8) and current turn (1 for Black, 2 for White)
@@ -139,27 +144,45 @@ async def api_train(req: TrainRequest, background_tasks: BackgroundTasks):
         try:
             # 1. Load Data
             dataset = CheckersDataset(req.dataset_file)
-            from torch.utils.data import DataLoader
-            # Small batch size for laptops
-            dataloader = DataLoader(dataset, batch_size=32, shuffle=True)
+            from torch.utils.data import DataLoader, random_split
+            
+            # Split into train/val
+            total = len(dataset)
+            val_size = max(1, int(total * req.val_split))
+            train_size = total - val_size
+            train_dataset, val_dataset = random_split(dataset, [train_size, val_size])
+            
+            train_loader = DataLoader(train_dataset, batch_size=req.batch_size, shuffle=True)
+            val_loader = DataLoader(val_dataset, batch_size=req.batch_size, shuffle=False)
             
             # 2. Initialize Model
             model = CheckersLightningModule(
                 learning_rate=req.learning_rate, 
-                hidden_dims=req.hidden_dims
+                hidden_dims=req.hidden_dims,
+                num_conv_layers=req.num_conv_layers,
+                dropout_rate=req.dropout_rate
             )
             
-            # 3. Configure Trainer with WebSocket callback
+            # 3. Configure Trainer with WebSocket callback + Early Stopping
+            callbacks = [WebSocketMetricsCallback(main_loop)]
+            if req.patience > 0:
+                callbacks.append(EarlyStopping(
+                    monitor='val_loss',
+                    patience=req.patience,
+                    mode='min',
+                    verbose=True
+                ))
+            
             trainer = Trainer(
                 max_epochs=req.epochs,
-                callbacks=[WebSocketMetricsCallback(main_loop)],
+                callbacks=callbacks,
                 enable_checkpointing=False, # Simplify for educational app
                 logger=False
             )
             
             # 4. Train
             print("Starting training loop...")
-            trainer.fit(model, train_dataloaders=dataloader)
+            trainer.fit(model, train_dataloaders=train_loader, val_dataloaders=val_loader)
             
             # Save the model into global state for inference
             current_model = model
@@ -174,6 +197,8 @@ async def api_train(req: TrainRequest, background_tasks: BackgroundTasks):
 
         except Exception as e:
             print(f"Training failed: {e}")
+            import traceback
+            traceback.print_exc()
         finally:
             is_training = False
 
