@@ -20,7 +20,8 @@ const WHITE_KING = 4;
 interface BoardProps {
     grid: number[][];
     currentTurn: number;
-    humanColor: number;
+    blackModelId: string | null;
+    whiteModelId: string | null;
     setGrid: (grid: number[][]) => void;
     setCurrentTurn: (turn: number) => void;
     setCnnProbabilities: (probs: any) => void;
@@ -64,7 +65,7 @@ const DraggablePiece = ({ id, piece, r, c, isDraggable }: { id: string, piece: n
                 backgroundColor: bgColor,
                 border,
                 boxShadow: isDragging ? '0 10px 25px rgba(0,0,0,0.5)' : '0 4px 6px rgba(0,0,0,0.3)',
-                cursor: isDraggable ? (isDragging ? 'grabbing' : 'grab') : 'not-allowed',
+                cursor: isDraggable ? (isDragging ? 'grabbing' : 'grab') : 'default',
                 opacity: isDraggable ? 1 : 0.8,
                 display: 'flex',
                 alignItems: 'center',
@@ -85,18 +86,18 @@ const DraggablePiece = ({ id, piece, r, c, isDraggable }: { id: string, piece: n
 // ----------------------------------------------------
 // Droppable Square Component
 // ----------------------------------------------------
-const DroppableSquare = ({ r, c, piece, currentTurn, humanColor }: { r: number, c: number, piece: number, currentTurn: number, humanColor: number }) => {
+const DroppableSquare = ({ r, c, piece, currentTurn, isHumanTurn }: { r: number, c: number, piece: number, currentTurn: number, isHumanTurn: boolean }) => {
     const isPlayable = (r + c) % 2 === 1;
     const id = `square-${r}-${c}`;
 
-    // Human plays whichever color is selected.
-    const isHumanPiece = piece === humanColor || piece === humanColor + 2;
-    const isDraggable = isPlayable && isHumanPiece && currentTurn === humanColor;
+    // A piece is draggable if it belongs to the current turn AND it's the human's turn
+    const belongsToCurrentTurn = (piece === currentTurn) || (piece === currentTurn + 2);
+    const isDraggable = isPlayable && belongsToCurrentTurn && isHumanTurn;
 
     const { isOver, setNodeRef } = useDroppable({
         id: id,
         data: { r, c },
-        disabled: !isPlayable // Only dark squares are valid drop zones
+        disabled: !isPlayable
     });
 
     const bgColor = isPlayable ? 'var(--board-dark)' : 'var(--board-light)';
@@ -129,28 +130,29 @@ const DroppableSquare = ({ r, c, piece, currentTurn, humanColor }: { r: number, 
 // Main Board Component
 // ----------------------------------------------------
 export const Board: React.FC<BoardProps> = ({
-    grid, currentTurn, humanColor, setGrid, setCurrentTurn, setCnnProbabilities, gameOver, setGameOver
+    grid, currentTurn, blackModelId, whiteModelId, setGrid, setCurrentTurn, setCnnProbabilities, gameOver, setGameOver
 }) => {
     const sensors = useSensors(
         useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
     );
 
+    // Determine if the current turn belongs to a human
+    const isCurrentTurnAI = (currentTurn === 1 && blackModelId !== null) || (currentTurn === 2 && whiteModelId !== null);
+    const isHumanTurn = !isCurrentTurnAI && !gameOver;
+
     const handleDragEnd = async (event: DragEndEvent) => {
         const { active, over } = event;
-        if (!over) return; // Dropped outside valid square
+        if (!over) return;
 
         const startData = active.data.current;
         const endData = over.data.current;
 
         if (!startData || !endData) return;
-
-        // Prevent dropping on the same square
         if (startData.r === endData.r && startData.c === endData.c) return;
 
         // Prevent human from moving if it's AI's turn or game over
-        if (currentTurn !== humanColor || gameOver) return;
+        if (!isHumanTurn) return;
 
-        // Ask Python backend if this is a legal Checkers move
         try {
             const valRes = await fetch('http://localhost:8000/api/validate_move', {
                 method: 'POST',
@@ -166,32 +168,22 @@ export const Board: React.FC<BoardProps> = ({
             });
             const valData = await valRes.json();
 
-            if (!valData.is_valid) {
-                // Move was rejected (e.g., missed a mandatory jump, or moved backwards)
-                return;
-            }
+            if (!valData.is_valid) return;
 
-            // 1. UI Update (Client-side fast feedback using validated data)
             const newGrid = grid.map(row => [...row]);
-
-            // Move Piece
             newGrid[startData.r][startData.c] = EMPTY;
             newGrid[endData.r][endData.c] = startData.piece;
 
-            // Remove jumped pieces identified by the engine
             if (valData.jumped_pieces) {
                 for (const [r, c] of valData.jumped_pieces) {
                     newGrid[r][c] = EMPTY;
                 }
             }
 
-            // Kinging logic Check
             if (startData.piece === BLACK && endData.r === 7) newGrid[endData.r][endData.c] = BLACK_KING;
             if (startData.piece === WHITE && endData.r === 0) newGrid[endData.r][endData.c] = WHITE_KING;
 
             setGrid(newGrid);
-
-            // Swap turn
             const nextTurn = currentTurn === 1 ? 2 : 1;
             setCurrentTurn(nextTurn);
         } catch (err) {
@@ -202,68 +194,97 @@ export const Board: React.FC<BoardProps> = ({
     const isInferencingRef = useRef(false);
 
     useEffect(() => {
-        // AI's turn
-        if (currentTurn !== humanColor && !isInferencingRef.current) {
-            isInferencingRef.current = true;
+        if (gameOver) return;
 
-            const fetchAIMove = async () => {
-                try {
-                    const response = await fetch('http://localhost:8000/api/infer', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            board_state: grid,
-                            current_turn: currentTurn,
-                            depth: 4
-                        })
-                    });
+        // Determine the model for the current turn
+        const modelId = currentTurn === 1 ? blackModelId : whiteModelId;
 
-                    const data = await response.json();
-                    setCnnProbabilities(data.cnn_probabilities);
+        // Only proceed if the current side has an AI model assigned
+        if (!modelId || isInferencingRef.current) return;
 
-                    if (data.move) {
-                        const aiGrid = grid.map(row => [...row]);
-                        const [startR, startC] = data.move.start;
-                        const [endR, endC] = data.move.end;
-                        const aiPiece = aiGrid[startR][startC];
+        isInferencingRef.current = true;
 
-                        aiGrid[startR][startC] = EMPTY;
-                        aiGrid[endR][endC] = aiPiece;
+        const fetchAIMove = async () => {
+            try {
+                const response = await fetch('http://localhost:8000/api/infer', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        board_state: grid,
+                        current_turn: currentTurn,
+                        depth: 4,
+                        model_id: modelId
+                    })
+                });
 
-                        if (aiPiece === BLACK && endR === 7) aiGrid[endR][endC] = BLACK_KING;
-                        if (aiPiece === WHITE && endR === 0) aiGrid[endR][endC] = WHITE_KING;
+                const data = await response.json();
+                setCnnProbabilities(data.cnn_probabilities);
 
-                        if (data.move.jumped_pieces && data.move.jumped_pieces.length > 0) {
-                            for (const [r, c] of data.move.jumped_pieces) {
-                                aiGrid[r][c] = EMPTY;
-                            }
+                if (data.move) {
+                    const aiGrid = grid.map(row => [...row]);
+                    const [startR, startC] = data.move.start;
+                    const [endR, endC] = data.move.end;
+                    const aiPiece = aiGrid[startR][startC];
+
+                    aiGrid[startR][startC] = EMPTY;
+                    aiGrid[endR][endC] = aiPiece;
+
+                    if (aiPiece === BLACK && endR === 7) aiGrid[endR][endC] = BLACK_KING;
+                    if (aiPiece === WHITE && endR === 0) aiGrid[endR][endC] = WHITE_KING;
+
+                    if (data.move.jumped_pieces && data.move.jumped_pieces.length > 0) {
+                        for (const [r, c] of data.move.jumped_pieces) {
+                            aiGrid[r][c] = EMPTY;
                         }
+                    }
 
-                        // Short delay makes the AI's move visible to a human
-                        setTimeout(() => {
-                            setGrid(aiGrid);
-                            setCurrentTurn(humanColor);
-                            isInferencingRef.current = false;
-                            if (data.game_over) {
-                                setGameOver(data.game_over);
-                            }
-                        }, 500);
-                    } else {
+                    // Delay so moves are visible to the human observer
+                    setTimeout(() => {
+                        setGrid(aiGrid);
+                        setCurrentTurn(currentTurn === 1 ? 2 : 1);
                         isInferencingRef.current = false;
                         if (data.game_over) {
                             setGameOver(data.game_over);
                         }
-                    }
-
-                } catch (err) {
-                    console.error("Move Error:", err);
+                    }, 500);
+                } else {
                     isInferencingRef.current = false;
+                    if (data.game_over) {
+                        setGameOver(data.game_over);
+                    }
                 }
-            };
 
-            fetchAIMove();
+            } catch (err) {
+                console.error("Move Error:", err);
+                isInferencingRef.current = false;
+            }
+        };
+
+        fetchAIMove();
+    }, [currentTurn, blackModelId, whiteModelId, grid, setGrid, setCurrentTurn, setCnnProbabilities, gameOver, setGameOver]);
+
+    // Game over display logic
+    const getGameOverText = () => {
+        if (!gameOver) return null;
+        const winnerName = gameOver === 1 ? 'Black' : 'White';
+        const blackIsAI = blackModelId !== null;
+        const whiteIsAI = whiteModelId !== null;
+
+        if (blackIsAI && whiteIsAI) {
+            return { title: `${winnerName} Wins!`, subtitle: 'AI vs AI match concluded.' };
+        } else if (!blackIsAI && !whiteIsAI) {
+            return { title: `${winnerName} Wins!`, subtitle: 'Player vs Player match concluded.' };
+        } else {
+            const humanSide = blackIsAI ? 2 : 1;
+            const humanWon = gameOver === humanSide;
+            return {
+                title: humanWon ? 'You Win!' : 'AI Wins!',
+                subtitle: `${winnerName} takes the game.`
+            };
         }
-    }, [currentTurn, humanColor, grid, setGrid, setCurrentTurn, setCnnProbabilities, gameOver, setGameOver]);
+    };
+
+    const gameOverInfo = getGameOverText();
 
     return (
         <div style={{
@@ -275,7 +296,7 @@ export const Board: React.FC<BoardProps> = ({
             boxShadow: '0 20px 25px -5px rgba(0,0,0,0.2)',
             position: 'relative'
         }}>
-            {gameOver && (
+            {gameOver && gameOverInfo && (
                 <div style={{
                     position: 'absolute',
                     top: 0, left: 0, right: 0, bottom: 0,
@@ -288,10 +309,10 @@ export const Board: React.FC<BoardProps> = ({
                     color: 'white',
                     backdropFilter: 'blur(4px)'
                 }}>
-                    <h2 style={{ fontSize: '2rem', marginBottom: '0.5rem', color: gameOver === humanColor ? '#4ade80' : '#f87171' }}>
-                        {gameOver === humanColor ? 'You Win!' : 'AI Wins!'}
+                    <h2 style={{ fontSize: '2rem', marginBottom: '0.5rem', color: '#4ade80' }}>
+                        {gameOverInfo.title}
                     </h2>
-                    <p style={{ margin: 0 }}>{gameOver === 1 ? 'Black' : 'White'} takes the game.</p>
+                    <p style={{ margin: 0 }}>{gameOverInfo.subtitle}</p>
                 </div>
             )}
             <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
@@ -304,7 +325,7 @@ export const Board: React.FC<BoardProps> = ({
                 }}>
                     {grid.map((row, r) =>
                         row.map((piece, c) => (
-                            <DroppableSquare key={`sq-${r}-${c}`} r={r} c={c} piece={piece} currentTurn={currentTurn} humanColor={humanColor} />
+                            <DroppableSquare key={`sq-${r}-${c}`} r={r} c={c} piece={piece} currentTurn={currentTurn} isHumanTurn={isHumanTurn} />
                         ))
                     )}
                 </div>

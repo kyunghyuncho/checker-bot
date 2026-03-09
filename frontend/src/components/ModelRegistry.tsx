@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Box, Trash2, CheckCircle } from 'lucide-react';
+import { Box, Trash2 } from 'lucide-react';
 
 interface ModelMeta {
     id: string;
@@ -14,16 +14,20 @@ interface ModelMeta {
     final_val_loss?: number;
 }
 
-export const ModelRegistry = () => {
+interface ModelRegistryProps {
+    blackModelId: string | null;
+    whiteModelId: string | null;
+    onAssign: (side: 'black' | 'white', modelId: string | null) => void;
+}
+
+export const ModelRegistry: React.FC<ModelRegistryProps> = ({ blackModelId, whiteModelId, onAssign }) => {
     const [models, setModels] = useState<ModelMeta[]>([]);
-    const [activeModelId, setActiveModelId] = useState<string | null>(null);
 
     const fetchModels = async () => {
         try {
             const res = await fetch('http://localhost:8000/api/models');
             const data = await res.json();
             setModels(data.models);
-            setActiveModelId(data.active_model_id);
         } catch (e) {
             console.error("Failed to fetch models:", e);
         }
@@ -31,8 +35,6 @@ export const ModelRegistry = () => {
 
     useEffect(() => {
         fetchModels();
-
-        // Listen for model updates via WebSocket
         const ws = new WebSocket('ws://localhost:8000/ws/metrics');
         ws.onmessage = (event) => {
             const msg = JSON.parse(event.data);
@@ -43,24 +45,31 @@ export const ModelRegistry = () => {
         return () => ws.close();
     }, []);
 
-    const handleSelect = async (modelId: string) => {
+    const handleDelete = async (modelId: string) => {
         try {
-            const res = await fetch(`http://localhost:8000/api/models/${modelId}/select`, { method: 'POST' });
-            const data = await res.json();
-            setActiveModelId(data.active_model_id);
+            await fetch(`http://localhost:8000/api/models/${modelId}`, { method: 'DELETE' });
+            setModels(prev => prev.filter(m => m.id !== modelId));
+            // Clear assignment if this model was assigned
+            if (blackModelId === modelId) onAssign('black', null);
+            if (whiteModelId === modelId) onAssign('white', null);
         } catch (e) {
-            console.error("Failed to select model:", e);
+            console.error("Failed to delete model:", e);
         }
     };
 
-    const handleDelete = async (modelId: string) => {
-        try {
-            const res = await fetch(`http://localhost:8000/api/models/${modelId}`, { method: 'DELETE' });
-            const data = await res.json();
-            setActiveModelId(data.active_model_id);
-            setModels(prev => prev.filter(m => m.id !== modelId));
-        } catch (e) {
-            console.error("Failed to delete model:", e);
+    const handleToggle = (side: 'black' | 'white', modelId: string) => {
+        const currentId = side === 'black' ? blackModelId : whiteModelId;
+        if (currentId === modelId) {
+            // Deselect
+            onAssign(side, null);
+        } else {
+            // If this model is already assigned to the other side, clear that first
+            const otherSide = side === 'black' ? 'white' : 'black';
+            const otherId = side === 'black' ? whiteModelId : blackModelId;
+            if (otherId === modelId) {
+                onAssign(otherSide, null);
+            }
+            onAssign(side, modelId);
         }
     };
 
@@ -69,18 +78,44 @@ export const ModelRegistry = () => {
         return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ' ' + d.toLocaleDateString([], { month: 'short', day: 'numeric' });
     };
 
+    const radioStyle = (active: boolean, color: string): React.CSSProperties => ({
+        width: '20px',
+        height: '20px',
+        borderRadius: '50%',
+        border: `2px solid ${active ? color : 'var(--glass-border)'}`,
+        backgroundColor: active ? color : 'transparent',
+        cursor: 'pointer',
+        flexShrink: 0,
+        transition: 'all 0.15s ease',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+    });
+
     return (
         <div className="panel">
-            <h2><Box size={20} /> Model Registry</h2>
+            <h2><Box size={20} /> Model Arena</h2>
+
+            {/* Column headers */}
+            {models.length > 0 && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem', padding: '0 0.75rem' }}>
+                    <div style={{ width: '20px', textAlign: 'center', fontSize: '0.65rem', color: 'var(--text-muted)', fontWeight: 600 }}>⚫</div>
+                    <div style={{ flex: 1, fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600 }}>Model</div>
+                    <div style={{ width: '20px', textAlign: 'center', fontSize: '0.65rem', color: 'var(--text-muted)', fontWeight: 600 }}>⚪</div>
+                    <div style={{ width: '22px' }} />
+                </div>
+            )}
 
             {models.length === 0 ? (
                 <div style={{ color: 'var(--text-muted)', fontSize: '0.875rem', textAlign: 'center', padding: '1rem 0' }}>
-                    No models trained yet. Use the Configuration panel to train one.
+                    No models trained yet. Train one above.
                 </div>
             ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
                     {models.map(m => {
-                        const isActive = m.id === activeModelId;
+                        const isBlack = m.id === blackModelId;
+                        const isWhite = m.id === whiteModelId;
+                        const isAssigned = isBlack || isWhite;
                         return (
                             <div
                                 key={m.id}
@@ -88,30 +123,26 @@ export const ModelRegistry = () => {
                                     display: 'flex',
                                     alignItems: 'center',
                                     gap: '0.5rem',
-                                    padding: '0.6rem 0.75rem',
+                                    padding: '0.5rem 0.75rem',
                                     borderRadius: '0.5rem',
-                                    backgroundColor: isActive ? 'rgba(59, 130, 246, 0.15)' : 'var(--bg-primary)',
-                                    border: `1px solid ${isActive ? 'var(--accent-blue)' : 'var(--glass-border)'}`,
+                                    backgroundColor: isAssigned ? 'rgba(59, 130, 246, 0.1)' : 'var(--bg-primary)',
+                                    border: `1px solid ${isAssigned ? 'var(--accent-blue)' : 'var(--glass-border)'}`,
                                     transition: 'all 0.2s ease',
-                                    cursor: 'pointer',
                                 }}
-                                onClick={() => handleSelect(m.id)}
                             >
-                                {/* Active indicator */}
-                                <CheckCircle
-                                    size={16}
-                                    style={{
-                                        color: isActive ? 'var(--accent-green)' : 'var(--bg-tertiary)',
-                                        flexShrink: 0
-                                    }}
+                                {/* Black radio */}
+                                <div
+                                    style={radioStyle(isBlack, 'var(--piece-black)')}
+                                    onClick={() => handleToggle('black', m.id)}
+                                    title="Assign to Black"
                                 />
 
                                 {/* Model info */}
                                 <div style={{ flex: 1, minWidth: 0 }}>
-                                    <div style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                                    <div style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-primary)' }}>
                                         {m.num_conv_layers}L / {m.hidden_dims}d / dr{m.dropout_rate}
                                     </div>
-                                    <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                                    <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
                                         <span>{m.epochs_trained}ep</span>
                                         {m.final_train_loss !== undefined && <span>T:{m.final_train_loss.toFixed(3)}</span>}
                                         {m.final_val_loss !== undefined && <span>V:{m.final_val_loss.toFixed(3)}</span>}
@@ -119,18 +150,20 @@ export const ModelRegistry = () => {
                                     </div>
                                 </div>
 
-                                {/* Delete button */}
+                                {/* White radio */}
+                                <div
+                                    style={radioStyle(isWhite, 'var(--piece-white)')}
+                                    onClick={() => handleToggle('white', m.id)}
+                                    title="Assign to White"
+                                />
+
+                                {/* Delete */}
                                 <button
-                                    onClick={(e) => { e.stopPropagation(); handleDelete(m.id); }}
+                                    onClick={() => handleDelete(m.id)}
                                     style={{
-                                        background: 'none',
-                                        border: 'none',
-                                        padding: '0.25rem',
-                                        color: 'var(--text-muted)',
-                                        cursor: 'pointer',
-                                        flexShrink: 0,
-                                        borderRadius: '0.25rem',
-                                        display: 'flex'
+                                        background: 'none', border: 'none', padding: '0.25rem',
+                                        color: 'var(--text-muted)', cursor: 'pointer', flexShrink: 0,
+                                        borderRadius: '0.25rem', display: 'flex'
                                     }}
                                     title="Delete model"
                                 >
@@ -141,6 +174,13 @@ export const ModelRegistry = () => {
                     })}
                 </div>
             )}
+
+            {/* Status bar */}
+            <div style={{ marginTop: '0.75rem', fontSize: '0.75rem', color: 'var(--text-muted)', display: 'flex', gap: '1rem', justifyContent: 'center' }}>
+                <span>⚫ {blackModelId ? 'AI' : 'Human'}</span>
+                <span>vs</span>
+                <span>⚪ {whiteModelId ? 'AI' : 'Human'}</span>
+            </div>
         </div>
     );
 };

@@ -30,8 +30,7 @@ app.add_middleware(
 # --- State Management ---
 active_websockets = []
 is_training = False
-current_model = None  # Will hold the trained LightningModule
-active_model_id = None  # ID of the currently selected model
+model_cache: dict = {}  # Cache of loaded models: model_id -> LightningModule
 
 # Model storage directory
 MODELS_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "backend", "models")
@@ -48,13 +47,16 @@ def _get_model_list():
     return models
 
 def _load_model_by_id(model_id: str):
-    """Load a saved model checkpoint by its ID."""
+    """Load a saved model checkpoint by its ID, using cache."""
+    if model_id in model_cache:
+        return model_cache[model_id]
     ckpt_path = os.path.join(MODELS_DIR, f"{model_id}.ckpt")
     meta_path = os.path.join(MODELS_DIR, f"{model_id}.meta.json")
     if not os.path.exists(ckpt_path) or not os.path.exists(meta_path):
         return None
     model = CheckersLightningModule.load_from_checkpoint(ckpt_path)
     model.eval()
+    model_cache[model_id] = model
     return model
 
 # --- Pydantic Models ---
@@ -79,7 +81,8 @@ class InferRequest(BaseModel):
     # The board grid (8x8) and current turn (1 for Black, 2 for White)
     board_state: list[list[int]]
     current_turn: int
-    depth: int = 1 # Search depth for inference
+    depth: int = 1
+    model_id: str | None = None  # Specific model to use for this inference
 
 class MoveValidationRequest(BaseModel):
     board_state: list[list[int]]
@@ -171,7 +174,7 @@ async def api_train(req: TrainRequest, background_tasks: BackgroundTasks):
     main_loop = asyncio.get_running_loop()
 
     def _run_train():
-        global is_training, current_model
+        global is_training
         is_training = True
         try:
             # 1. Load Data
@@ -216,13 +219,15 @@ async def api_train(req: TrainRequest, background_tasks: BackgroundTasks):
             print("Starting training loop...")
             trainer.fit(model, train_dataloaders=train_loader, val_dataloaders=val_loader)
             
-            # Save the model into global state for inference
-            current_model = model
-            
+            # Save the model into cache for immediate inference
             # 5. Persist model to disk
             model_id = datetime.now().strftime("%Y%m%d_%H%M%S")
             ckpt_path = os.path.join(MODELS_DIR, f"{model_id}.ckpt")
             trainer.save_checkpoint(ckpt_path)
+            
+            # Cache the trained model
+            model.eval()
+            model_cache[model_id] = model
             
             meta = {
                 "id": model_id,
@@ -245,7 +250,6 @@ async def api_train(req: TrainRequest, background_tasks: BackgroundTasks):
             with open(os.path.join(MODELS_DIR, f"{model_id}.meta.json"), "w") as mf:
                 json.dump(meta, mf, indent=2)
             
-            active_model_id = model_id
             print(f"Training complete! Model saved as {model_id}")
             
             # Notify frontend
@@ -316,14 +320,13 @@ async def api_validate_move(req: MoveValidationRequest):
 async def api_infer(req: InferRequest):
     """
     Returns the AI's best move given the current board state.
-    Utilizes the trained CNN if available to evaluate the heuristic,
-    otherwise falls back to the hardcoded material heuristic.
+    Uses the model specified by model_id if provided.
     """
     board = CheckersBoard()
     board.grid = req.board_state
     board.current_turn = req.current_turn
 
-    # 1. Check if game is already over (meaning the human's last move won the game)
+    # 1. Check if game is already over
     game_over = board.check_game_over()
     if game_over is not None:
         return {
@@ -332,15 +335,19 @@ async def api_infer(req: InferRequest):
             "game_over": game_over
         }
 
-    # 2. Get CNN Probabilities if model is loaded
+    # 2. Get CNN Probabilities if a model is specified
     cnn_probs = None
-    if current_model is not None:
+    model = None
+    if req.model_id:
+        model = _load_model_by_id(req.model_id)
+    
+    if model is not None:
         tensor = board_to_tensor(req.board_state, req.current_turn)
         tensor = tensor.unsqueeze(0) 
         
-        current_model.eval()
+        model.eval()
         with torch.no_grad():
-            p_black, p_white = current_model(tensor)
+            p_black, p_white = model(tensor)
             cnn_probs = {
                 "p_black": round(p_black.item(), 4),
                 "p_white": round(p_white.item(), 4)
@@ -386,26 +393,11 @@ async def websocket_endpoint(websocket: WebSocket):
 @app.get("/api/models")
 async def api_list_models():
     """Returns the list of all saved models with metadata."""
-    return {
-        "models": _get_model_list(),
-        "active_model_id": active_model_id
-    }
-
-@app.post("/api/models/{model_id}/select")
-async def api_select_model(model_id: str):
-    """Load and activate a previously trained model for inference."""
-    global current_model, active_model_id
-    model = _load_model_by_id(model_id)
-    if model is None:
-        raise HTTPException(status_code=404, detail=f"Model '{model_id}' not found.")
-    current_model = model
-    active_model_id = model_id
-    return {"message": f"Model '{model_id}' activated.", "active_model_id": model_id}
+    return {"models": _get_model_list()}
 
 @app.delete("/api/models/{model_id}")
 async def api_delete_model(model_id: str):
     """Delete a saved model from disk."""
-    global current_model, active_model_id
     ckpt_path = os.path.join(MODELS_DIR, f"{model_id}.ckpt")
     meta_path = os.path.join(MODELS_DIR, f"{model_id}.meta.json")
     
@@ -416,9 +408,7 @@ async def api_delete_model(model_id: str):
         os.remove(ckpt_path)
     os.remove(meta_path)
     
-    # If we just deleted the active model, clear it
-    if active_model_id == model_id:
-        current_model = None
-        active_model_id = None
+    # Remove from cache if present
+    model_cache.pop(model_id, None)
     
-    return {"message": f"Model '{model_id}' deleted.", "active_model_id": active_model_id}
+    return {"message": f"Model '{model_id}' deleted."}
