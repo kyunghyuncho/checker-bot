@@ -3,7 +3,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import asyncio
 import json
+import os
 import torch
+from datetime import datetime
 from pytorch_lightning import Trainer
 from pytorch_lightning.callbacks import Callback, EarlyStopping
 
@@ -26,11 +28,34 @@ app.add_middleware(
 )
 
 # --- State Management ---
-# In a production app, we would use a database and Redis.
-# For this local educational app, global state is sufficient.
 active_websockets = []
 is_training = False
-current_model = None # Will hold the trained LightningModule
+current_model = None  # Will hold the trained LightningModule
+active_model_id = None  # ID of the currently selected model
+
+# Model storage directory
+MODELS_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "backend", "models")
+os.makedirs(MODELS_DIR, exist_ok=True)
+
+def _get_model_list():
+    """Scan the models directory and return metadata for all saved models."""
+    models = []
+    for f in sorted(os.listdir(MODELS_DIR)):
+        if f.endswith(".meta.json"):
+            with open(os.path.join(MODELS_DIR, f), "r") as fh:
+                meta = json.load(fh)
+                models.append(meta)
+    return models
+
+def _load_model_by_id(model_id: str):
+    """Load a saved model checkpoint by its ID."""
+    ckpt_path = os.path.join(MODELS_DIR, f"{model_id}.ckpt")
+    meta_path = os.path.join(MODELS_DIR, f"{model_id}.meta.json")
+    if not os.path.exists(ckpt_path) or not os.path.exists(meta_path):
+        return None
+    model = CheckersLightningModule.load_from_checkpoint(ckpt_path)
+    model.eval()
+    return model
 
 # --- Pydantic Models ---
 class GenerateRequest(BaseModel):
@@ -189,12 +214,46 @@ async def api_train(req: TrainRequest, background_tasks: BackgroundTasks):
             
             # Save the model into global state for inference
             current_model = model
-            print("Training complete!")
+            
+            # 5. Persist model to disk
+            model_id = datetime.now().strftime("%Y%m%d_%H%M%S")
+            ckpt_path = os.path.join(MODELS_DIR, f"{model_id}.ckpt")
+            trainer.save_checkpoint(ckpt_path)
+            
+            meta = {
+                "id": model_id,
+                "created_at": datetime.now().isoformat(),
+                "epochs_trained": trainer.current_epoch + 1,
+                "hidden_dims": req.hidden_dims,
+                "num_conv_layers": req.num_conv_layers,
+                "dropout_rate": req.dropout_rate,
+                "learning_rate": req.learning_rate,
+                "batch_size": req.batch_size,
+            }
+            final_metrics = trainer.callback_metrics
+            tl = final_metrics.get("train_loss")
+            vl = final_metrics.get("val_loss")
+            if tl is not None:
+                meta["final_train_loss"] = round(tl.item(), 4)
+            if vl is not None:
+                meta["final_val_loss"] = round(vl.item(), 4)
+                
+            with open(os.path.join(MODELS_DIR, f"{model_id}.meta.json"), "w") as mf:
+                json.dump(meta, mf, indent=2)
+            
+            active_model_id = model_id
+            print(f"Training complete! Model saved as {model_id}")
             
             # Notify frontend
             for ws in active_websockets:
                 asyncio.run_coroutine_threadsafe(
                     ws.send_text(json.dumps({"type": "status", "message": "Training Complete!"})),
+                    main_loop
+                )
+            # Also notify with model list update
+            for ws in active_websockets:
+                asyncio.run_coroutine_threadsafe(
+                    ws.send_text(json.dumps({"type": "models_updated"})),
                     main_loop
                 )
 
@@ -208,7 +267,6 @@ async def api_train(req: TrainRequest, background_tasks: BackgroundTasks):
     background_tasks.add_task(_run_train)
     return {"message": "Training started."}
 
-import os
 
 @app.get("/api/dataset")
 async def api_dataset(file_path: str = "backend/data/dataset.json"):
@@ -314,7 +372,49 @@ async def websocket_endpoint(websocket: WebSocket):
     active_websockets.append(websocket)
     try:
         while True:
-            # Keep connection alive
             _ = await websocket.receive_text()
     except WebSocketDisconnect:
         active_websockets.remove(websocket)
+
+
+# --- Model Registry Endpoints ---
+
+@app.get("/api/models")
+async def api_list_models():
+    """Returns the list of all saved models with metadata."""
+    return {
+        "models": _get_model_list(),
+        "active_model_id": active_model_id
+    }
+
+@app.post("/api/models/{model_id}/select")
+async def api_select_model(model_id: str):
+    """Load and activate a previously trained model for inference."""
+    global current_model, active_model_id
+    model = _load_model_by_id(model_id)
+    if model is None:
+        raise HTTPException(status_code=404, detail=f"Model '{model_id}' not found.")
+    current_model = model
+    active_model_id = model_id
+    return {"message": f"Model '{model_id}' activated.", "active_model_id": model_id}
+
+@app.delete("/api/models/{model_id}")
+async def api_delete_model(model_id: str):
+    """Delete a saved model from disk."""
+    global current_model, active_model_id
+    ckpt_path = os.path.join(MODELS_DIR, f"{model_id}.ckpt")
+    meta_path = os.path.join(MODELS_DIR, f"{model_id}.meta.json")
+    
+    if not os.path.exists(meta_path):
+        raise HTTPException(status_code=404, detail=f"Model '{model_id}' not found.")
+    
+    if os.path.exists(ckpt_path):
+        os.remove(ckpt_path)
+    os.remove(meta_path)
+    
+    # If we just deleted the active model, clear it
+    if active_model_id == model_id:
+        current_model = None
+        active_model_id = None
+    
+    return {"message": f"Model '{model_id}' deleted.", "active_model_id": active_model_id}

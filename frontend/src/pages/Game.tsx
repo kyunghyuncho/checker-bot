@@ -4,6 +4,7 @@ import { Board } from '../components/Board';
 import { ConfigPanel } from '../components/ConfigPanel';
 import { BrainVisualizer } from '../components/BrainVisualizer';
 import { Metrics } from '../components/Metrics';
+import { ModelRegistry } from '../components/ModelRegistry';
 
 // The main Dashboard view for playing and training
 export const Game = () => {
@@ -43,6 +44,7 @@ export const Game = () => {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
                 <ConfigPanel />
                 <Metrics />
+                <ModelRegistry />
             </div>
 
             {/* Center Column: The Checkers Board */}

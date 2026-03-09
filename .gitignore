@@ -212,6 +212,7 @@ frontend/dist/
 
 # App data
 backend/data/dataset.json
+backend/models/
 
 # Temp test files
 tmp_test*.py
