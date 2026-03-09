@@ -105,12 +105,16 @@ class WebSocketMetricsCallback(Callback):
         if train_loss_val is None:
              train_loss_val = metrics.get("train_loss")
 
+        # Skip the sanity-check validation that PL runs before training starts
+        if train_loss_val is None:
+            return
+
         val_loss_val = metrics.get("val_loss")
 
         out = {
             "epoch": trainer.current_epoch,
-            "train_loss": train_loss_val.item() if train_loss_val is not None else 0,
-            "val_loss": val_loss_val.item() if val_loss_val is not None else None,
+            "train_loss": round(train_loss_val.item(), 4),
+            "val_loss": round(val_loss_val.item(), 4) if val_loss_val is not None else None,
             "type": "metric"
         }
         

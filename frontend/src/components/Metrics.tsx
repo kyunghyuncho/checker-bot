@@ -20,11 +20,20 @@ export const Metrics = () => {
             const msg = JSON.parse(event.data);
             if (msg.type === 'metric') {
                 setStatus('Training...');
-                setData(prev => [...prev, {
-                    epoch: msg.epoch,
-                    train_loss: msg.train_loss,
-                    val_loss: msg.val_loss ?? undefined
-                }]);
+                // Reset chart data when a new training run starts (epoch 0)
+                if (msg.epoch === 0) {
+                    setData([{
+                        epoch: msg.epoch,
+                        train_loss: msg.train_loss,
+                        val_loss: msg.val_loss ?? undefined
+                    }]);
+                } else {
+                    setData(prev => [...prev, {
+                        epoch: msg.epoch,
+                        train_loss: msg.train_loss,
+                        val_loss: msg.val_loss ?? undefined
+                    }]);
+                }
             } else if (msg.type === 'status') {
                 setStatus(msg.message);
             }
