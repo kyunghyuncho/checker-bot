@@ -31,6 +31,7 @@ export const Game = () => {
     const [whiteModelId, setWhiteModelId] = useState<string | null>(null);
     const [cnnProbabilities, setCnnProbabilities] = useState<{ p_black: number, p_white: number } | null>(null);
     const [gameOver, setGameOver] = useState<number | null>(null);
+    const [epsilon, setEpsilon] = useState(0.05);
 
     const handleReset = () => {
         setBoardState(getInitialGrid());
@@ -72,8 +73,12 @@ export const Game = () => {
                         <RotateCcw size={16} /> Reset Game
                     </button>
                 </div>
-                <div className="edu-note" style={{ width: '100%', marginTop: 0, marginBottom: '1rem' }}>
-                    <strong>Mode:</strong> {modeLabel}
+                <div className="edu-note" style={{ width: '100%', marginTop: 0, marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                    <div><strong>Mode:</strong> {modeLabel}</div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginLeft: 'auto', fontSize: '0.8rem' }}>
+                        <label style={{ whiteSpace: 'nowrap' }}>ε {epsilon.toFixed(2)}</label>
+                        <input type="range" min="0" max="0.3" step="0.01" value={epsilon} onChange={(e) => setEpsilon(Number(e.target.value))} style={{ width: '80px' }} />
+                    </div>
                 </div>
 
                 <Board
@@ -81,6 +86,7 @@ export const Game = () => {
                     currentTurn={currentTurn}
                     blackModelId={blackModelId}
                     whiteModelId={whiteModelId}
+                    epsilon={epsilon}
                     setGrid={setBoardState}
                     setCurrentTurn={setCurrentTurn}
                     setCnnProbabilities={setCnnProbabilities}

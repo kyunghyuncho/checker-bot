@@ -83,6 +83,7 @@ class InferRequest(BaseModel):
     current_turn: int
     depth: int = 1
     model_id: str | None = None  # Specific model to use for this inference
+    epsilon: float = 0.0  # Randomness for move selection (0 = deterministic)
 
 class MoveValidationRequest(BaseModel):
     board_state: list[list[int]]
@@ -354,7 +355,7 @@ async def api_infer(req: InferRequest):
             }
 
     # 3. Get the best move from the engine
-    best_move = get_best_move(board, depth=req.depth, epsilon=0)
+    best_move = get_best_move(board, depth=req.depth, epsilon=req.epsilon)
 
     move_payload = None
     if best_move:
