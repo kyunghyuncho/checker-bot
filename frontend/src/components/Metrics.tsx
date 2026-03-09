@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { BarChart2 } from 'lucide-react';
 
 interface MetricPoint {
     epoch: number;
     train_loss: number;
+    val_loss?: number | null;
 }
 
 export const Metrics = () => {
@@ -19,7 +20,11 @@ export const Metrics = () => {
             const msg = JSON.parse(event.data);
             if (msg.type === 'metric') {
                 setStatus('Training...');
-                setData(prev => [...prev, { epoch: msg.epoch, train_loss: msg.train_loss }]);
+                setData(prev => [...prev, {
+                    epoch: msg.epoch,
+                    train_loss: msg.train_loss,
+                    val_loss: msg.val_loss ?? undefined
+                }]);
             } else if (msg.type === 'status') {
                 setStatus(msg.message);
             }
@@ -48,12 +53,14 @@ export const Metrics = () => {
                                 contentStyle={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--glass-border)', borderRadius: '0.5rem' }}
                                 itemStyle={{ color: 'var(--text-primary)' }}
                             />
-                            <Line type="monotone" dataKey="train_loss" stroke="var(--accent-purple)" strokeWidth={3} dot={false} />
+                            <Legend wrapperStyle={{ color: 'var(--text-secondary)' }} />
+                            <Line type="monotone" dataKey="train_loss" name="Train Loss" stroke="var(--accent-purple)" strokeWidth={3} dot={false} />
+                            <Line type="monotone" dataKey="val_loss" name="Val Loss" stroke="var(--accent-blue)" strokeWidth={3} dot={false} strokeDasharray="5 5" />
                         </LineChart>
                     </ResponsiveContainer>
                 ) : (
                     <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)' }}>
-                        Start training to see loss curve.
+                        Start training to see loss curves.
                     </div>
                 )}
             </div>

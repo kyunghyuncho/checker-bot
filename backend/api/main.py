@@ -73,16 +73,19 @@ class WebSocketMetricsCallback(Callback):
     def __init__(self, main_loop):
         self.main_loop = main_loop
 
-    def on_train_epoch_end(self, trainer, pl_module):
+    def on_validation_epoch_end(self, trainer, pl_module):
         metrics = trainer.callback_metrics
-        # Extract scalar values from tensors
-        train_loss_val = metrics.get("train_loss_epoch")  # PL tracks epoch level loss with _epoch suffix
+
+        train_loss_val = metrics.get("train_loss_epoch")
         if train_loss_val is None:
              train_loss_val = metrics.get("train_loss")
+
+        val_loss_val = metrics.get("val_loss")
 
         out = {
             "epoch": trainer.current_epoch,
             "train_loss": train_loss_val.item() if train_loss_val is not None else 0,
+            "val_loss": val_loss_val.item() if val_loss_val is not None else None,
             "type": "metric"
         }
         
