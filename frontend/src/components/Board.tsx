@@ -47,7 +47,7 @@ const DraggablePiece = ({ id, piece, r, c, isDraggable }: { id: string, piece: n
     let bgColor = 'transparent';
     let border = 'none';
     if (piece === BLACK || piece === BLACK_KING) {
-        bgColor = 'var(--piece-black)';
+        bgColor = 'var(--piece-red)';
         border = `2px solid ${piece === BLACK_KING ? 'gold' : '#922b21'}`;
     } else if (piece === WHITE || piece === WHITE_KING) {
         bgColor = 'var(--piece-white)';
@@ -266,7 +266,7 @@ export const Board: React.FC<BoardProps> = ({
     // Game over display logic
     const getGameOverText = () => {
         if (!gameOver) return null;
-        const winnerName = gameOver === 1 ? 'Black' : 'White';
+        const winnerName = gameOver === 1 ? 'Red' : 'White';
         const blackIsAI = blackModelId !== null;
         const whiteIsAI = whiteModelId !== null;
 

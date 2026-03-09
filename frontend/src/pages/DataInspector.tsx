@@ -63,7 +63,7 @@ export const DataInspector = () => {
                                     {val !== 0 && (
                                         <div style={{
                                             width: '70%', height: '70%', borderRadius: '50%',
-                                            backgroundColor: (val === 1 || val === 3) ? 'var(--piece-black)' : 'var(--piece-white)',
+                                            backgroundColor: (val === 1 || val === 3) ? 'var(--piece-red)' : 'var(--piece-white)',
                                             border: val === 3 || val === 4 ? '2px solid gold' : 'none',
                                             display: 'flex', justifyContent: 'center', alignItems: 'center'
                                         }}>
@@ -113,11 +113,11 @@ export const DataInspector = () => {
                         <div style={{ marginBottom: '1rem' }}>
                             <strong style={{ color: 'var(--accent-blue)' }}>Label (Ground Truth):</strong><br />
                             {loading ? "Loading..." : error ? "Error loading" : dataset.length === 0 ? "No dataset found. Generate some games first!" : currentState ? (
-                                currentState.label === 1.0 ? "1.0 (Black Win)" :
+                                currentState.label === 1.0 ? "1.0 (Red Win)" :
                                     currentState.label === 0.0 ? "0.0 (White Win)" : "0.5 (Draw)"
                             ) : "N/A"}
                             <br /><br />
-                            <strong style={{ color: 'var(--accent-green)' }}>Turn to move:</strong> {currentState ? (currentState.turn === 1 ? 'Black' : 'White') : "N/A"}
+                            <strong style={{ color: 'var(--accent-green)' }}>Turn to move:</strong> {currentState ? (currentState.turn === 1 ? 'Red' : 'White') : "N/A"}
                         </div>
 
                         <div>

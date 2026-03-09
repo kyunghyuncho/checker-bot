@@ -49,7 +49,7 @@ export const Game = () => {
     const whiteIsAI = whiteModelId !== null;
     const modeLabel = blackIsAI && whiteIsAI ? 'AI vs AI' :
         !blackIsAI && !whiteIsAI ? 'Human vs Human' :
-            blackIsAI ? 'AI (Black) vs Human (White)' : 'Human (Black) vs AI (White)';
+            blackIsAI ? 'AI (Red) vs Human (White)' : 'Human (Red) vs AI (White)';
 
     return (
         <div className="dashboard-grid">
@@ -89,7 +89,7 @@ export const Game = () => {
                 />
 
                 <div style={{ marginTop: '1rem', display: 'flex', gap: '1rem', alignItems: 'center' }}>
-                    <div className={`status-indicator ${currentTurn === 1 ? 'active' : ''}`} style={{ backgroundColor: 'var(--piece-black)' }} /> Black {currentTurn === 1 ? "(Active)" : ""}
+                    <div className={`status-indicator ${currentTurn === 1 ? 'active' : ''}`} style={{ backgroundColor: 'var(--piece-red)' }} /> Red {currentTurn === 1 ? "(Active)" : ""}
                     <div className={`status-indicator ${currentTurn === 2 ? 'active' : ''}`} style={{ backgroundColor: 'var(--piece-white)' }} /> White {currentTurn === 2 ? "(Active)" : ""}
                 </div>
             </div>
@@ -111,7 +111,7 @@ export const Game = () => {
                     }}>
                         <li><strong>Mode:</strong> Assign models to sides in the Model Arena panel. Unassigned sides are human-controlled.</li>
                         <li><strong>Turn Order:</strong> <em>White</em> always moves first.</li>
-                        <li><strong>Direction:</strong> Black starts at the top and moves <em>down</em>. White starts at the bottom and moves <em>up</em>.</li>
+                        <li><strong>Direction:</strong> Red starts at the top and moves <em>down</em>. White starts at the bottom and moves <em>up</em>.</li>
                         <li><strong>Movement:</strong> Pieces move diagonally forward one square at a time.</li>
                         <li><strong>Jumping:</strong> If an opponent's piece is diagonally in front of you with an empty space behind it, you <em>must</em> jump it.</li>
                         <li><strong>Kings:</strong> Reaching the far edge crowns your piece a King (K). Kings can move diagonally forward <em>and</em> backward.</li>

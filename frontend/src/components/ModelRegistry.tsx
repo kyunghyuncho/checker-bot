@@ -99,7 +99,7 @@ export const ModelRegistry: React.FC<ModelRegistryProps> = ({ blackModelId, whit
             {/* Column headers */}
             {models.length > 0 && (
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem', padding: '0 0.75rem' }}>
-                    <div style={{ width: '20px', textAlign: 'center', fontSize: '0.65rem', color: 'var(--text-muted)', fontWeight: 600 }}>⚫</div>
+                    <div style={{ width: '20px', textAlign: 'center', fontSize: '0.65rem', color: 'var(--text-muted)', fontWeight: 600 }}>🔴</div>
                     <div style={{ flex: 1, fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600 }}>Model</div>
                     <div style={{ width: '20px', textAlign: 'center', fontSize: '0.65rem', color: 'var(--text-muted)', fontWeight: 600 }}>⚪</div>
                     <div style={{ width: '22px' }} />
@@ -132,9 +132,9 @@ export const ModelRegistry: React.FC<ModelRegistryProps> = ({ blackModelId, whit
                             >
                                 {/* Black radio */}
                                 <div
-                                    style={radioStyle(isBlack, 'var(--piece-black)')}
+                                    style={radioStyle(isBlack, 'var(--piece-red)')}
                                     onClick={() => handleToggle('black', m.id)}
-                                    title="Assign to Black"
+                                    title="Assign to Red"
                                 />
 
                                 {/* Model info */}
@@ -177,7 +177,7 @@ export const ModelRegistry: React.FC<ModelRegistryProps> = ({ blackModelId, whit
 
             {/* Status bar */}
             <div style={{ marginTop: '0.75rem', fontSize: '0.75rem', color: 'var(--text-muted)', display: 'flex', gap: '1rem', justifyContent: 'center' }}>
-                <span>⚫ {blackModelId ? 'AI' : 'Human'}</span>
+                <span>🔴 {blackModelId ? 'AI' : 'Human'}</span>
                 <span>vs</span>
                 <span>⚪ {whiteModelId ? 'AI' : 'Human'}</span>
             </div>

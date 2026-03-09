@@ -22,7 +22,7 @@ export const BrainVisualizer: React.FC<BrainProps> = ({ probabilities }) => {
 
                     <div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                            <span style={{ fontWeight: 600 }}>Black Win Probability</span>
+                            <span style={{ fontWeight: 600 }}>Red Win Probability</span>
                             <span style={{ color: 'var(--text-primary)', fontWeight: 'bold' }}>
                                 {(probabilities.p_black * 100).toFixed(1)}%
                             </span>
@@ -32,7 +32,7 @@ export const BrainVisualizer: React.FC<BrainProps> = ({ probabilities }) => {
                             <div style={{
                                 width: `${probabilities.p_black * 100}%`,
                                 height: '100%',
-                                backgroundColor: 'var(--piece-black)',
+                                backgroundColor: 'var(--piece-red)',
                                 borderRight: '2px solid #922b21',
                                 transition: 'width 0.5s ease-out'
                             }} />
