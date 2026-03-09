@@ -63,12 +63,6 @@ export const ModelRegistry: React.FC<ModelRegistryProps> = ({ blackModelId, whit
             // Deselect
             onAssign(side, null);
         } else {
-            // If this model is already assigned to the other side, clear that first
-            const otherSide = side === 'black' ? 'white' : 'black';
-            const otherId = side === 'black' ? whiteModelId : blackModelId;
-            if (otherId === modelId) {
-                onAssign(otherSide, null);
-            }
             onAssign(side, modelId);
         }
     };
