@@ -13,7 +13,7 @@ from pytorch_lightning.callbacks import Callback, EarlyStopping
 from backend.data.generator import generate_dataset
 from backend.model.lightning_module import CheckersDataset, CheckersLightningModule
 from backend.model.cnn import board_to_tensor
-from backend.engine.board import CheckersBoard
+from backend.engine.board import CheckersBoard, BLACK, WHITE
 from backend.engine.minimax import get_best_move
 
 app = FastAPI(title="Checkers Deep Learning API")
@@ -368,6 +368,9 @@ async def api_infer(req: InferRequest):
         # 4. Apply the move to see if the AI's move won the game
         board.make_move(best_move)
         game_over = board.check_game_over()
+    else:
+        # No valid move found — current player loses
+        game_over = WHITE if req.current_turn == BLACK else BLACK
 
     return {
         "move": move_payload,
