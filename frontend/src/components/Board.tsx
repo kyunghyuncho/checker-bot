@@ -50,6 +50,7 @@ interface BoardProps {
     blackModelId: string | null;
     whiteModelId: string | null;
     epsilon: number;
+    isPlaying: boolean;
     setGrid: (grid: number[][]) => void;
     setCurrentTurn: (turn: number) => void;
     setCnnProbabilities: (probs: any) => void;
@@ -158,7 +159,7 @@ const DroppableSquare = ({ r, c, piece, currentTurn, isHumanTurn }: { r: number,
 // Main Board Component
 // ----------------------------------------------------
 export const Board: React.FC<BoardProps> = ({
-    grid, currentTurn, blackModelId, whiteModelId, epsilon, setGrid, setCurrentTurn, setCnnProbabilities, gameOver, setGameOver
+    grid, currentTurn, blackModelId, whiteModelId, epsilon, isPlaying, setGrid, setCurrentTurn, setCnnProbabilities, gameOver, setGameOver
 }) => {
     const sensors = useSensors(
         useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
@@ -222,7 +223,7 @@ export const Board: React.FC<BoardProps> = ({
     const isInferencingRef = useRef(false);
 
     useEffect(() => {
-        if (gameOver) return;
+        if (gameOver || !isPlaying) return;
 
         // Determine the model for the current turn
         const modelId = currentTurn === 1 ? blackModelId : whiteModelId;
@@ -290,7 +291,7 @@ export const Board: React.FC<BoardProps> = ({
         };
 
         fetchAIMove();
-    }, [currentTurn, blackModelId, whiteModelId, grid, setGrid, setCurrentTurn, setCnnProbabilities, gameOver, setGameOver]);
+    }, [currentTurn, blackModelId, whiteModelId, grid, setGrid, setCurrentTurn, setCnnProbabilities, gameOver, setGameOver, isPlaying]);
 
     // Game over display logic
     const getGameOverText = () => {

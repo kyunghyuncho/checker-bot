@@ -22,7 +22,7 @@
  *   - gameOver: winner ID when the game ends (null while active)
  */
 import { useState } from 'react';
-import { Info, RotateCcw } from 'lucide-react';
+import { Info, RotateCcw, Play, Pause } from 'lucide-react';
 import { Board } from '../components/Board';
 import { ConfigPanel } from '../components/ConfigPanel';
 import { BrainVisualizer } from '../components/BrainVisualizer';
@@ -55,12 +55,14 @@ export const Game = () => {
     const [cnnProbabilities, setCnnProbabilities] = useState<{ p_black: number, p_white: number } | null>(null);
     const [gameOver, setGameOver] = useState<number | null>(null);
     const [epsilon, setEpsilon] = useState(0.05);
+    const [isPlaying, setIsPlaying] = useState(false);
 
     const handleReset = () => {
         setBoardState(getInitialGrid());
-        setCurrentTurn(2); // Reset to White's turn
+        setCurrentTurn(2);
         setCnnProbabilities(null);
         setGameOver(null);
+        setIsPlaying(false); // Stop play on reset
     };
 
     const handleModelAssign = (side: 'black' | 'white', modelId: string | null) => {
@@ -92,9 +94,14 @@ export const Game = () => {
             <div className="panel" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center', marginBottom: '1rem' }}>
                     <h2 style={{ margin: 0, borderBottom: 'none', paddingBottom: 0 }}>Interactive Board</h2>
-                    <button onClick={handleReset} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', backgroundColor: 'var(--bg-secondary)', padding: '0.5rem 1rem', fontSize: '0.875rem' }}>
-                        <RotateCcw size={16} /> Reset Game
-                    </button>
+                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                        <button onClick={() => setIsPlaying(!isPlaying)} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', backgroundColor: isPlaying ? 'var(--accent-red)' : 'var(--accent-green)', padding: '0.5rem 1rem', fontSize: '0.875rem', color: 'white' }}>
+                            {isPlaying ? <><Pause size={16} /> Pause</> : <><Play size={16} /> Play</>}
+                        </button>
+                        <button onClick={handleReset} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', backgroundColor: 'var(--bg-secondary)', padding: '0.5rem 1rem', fontSize: '0.875rem' }}>
+                            <RotateCcw size={16} /> Reset
+                        </button>
+                    </div>
                 </div>
                 <div className="edu-note" style={{ width: '100%', marginTop: 0, marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
                     <div><strong>Mode:</strong> {modeLabel}</div>
@@ -110,6 +117,7 @@ export const Game = () => {
                     blackModelId={blackModelId}
                     whiteModelId={whiteModelId}
                     epsilon={epsilon}
+                    isPlaying={isPlaying}
                     setGrid={setBoardState}
                     setCurrentTurn={setCurrentTurn}
                     setCnnProbabilities={setCnnProbabilities}
