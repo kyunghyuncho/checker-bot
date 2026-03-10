@@ -15,6 +15,7 @@ interface RankingEntry {
     draws: number;
     total: number;
     win_rate: number;
+    rating?: number;
 }
 
 interface ProgressUpdate {
@@ -251,7 +252,7 @@ export const Tournament = () => {
                 {/* Final Rankings table */}
                 {rankings.length > 0 && (
                     <div className="panel" style={{ marginBottom: '1.5rem' }}>
-                        <h2 style={{ fontSize: '1rem', marginBottom: '0.75rem' }}><Trophy size={18} /> Rankings</h2>
+                        <h2 style={{ fontSize: '1rem', marginBottom: '0.75rem' }}><Trophy size={18} /> Rankings (Bradley-Terry)</h2>
                         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
                             <thead>
                                 <tr style={{ borderBottom: '1px solid var(--border-color)', color: 'var(--text-muted)', textTransform: 'uppercase', fontSize: '0.7rem', letterSpacing: '0.05em' }}>
@@ -261,6 +262,7 @@ export const Tournament = () => {
                                     <th style={{ textAlign: 'center', padding: '0.5rem' }}>L</th>
                                     <th style={{ textAlign: 'center', padding: '0.5rem' }}>D</th>
                                     <th style={{ textAlign: 'center', padding: '0.5rem' }}>Games</th>
+                                    <th style={{ textAlign: 'right', padding: '0.5rem' }}>Rating</th>
                                     <th style={{ textAlign: 'right', padding: '0.5rem' }}>Win Rate</th>
                                 </tr>
                             </thead>
@@ -275,7 +277,10 @@ export const Tournament = () => {
                                         <td style={{ padding: '0.5rem', textAlign: 'center', color: 'var(--accent-red)' }}>{r.losses}</td>
                                         <td style={{ padding: '0.5rem', textAlign: 'center', color: 'var(--text-muted)' }}>{r.draws}</td>
                                         <td style={{ padding: '0.5rem', textAlign: 'center' }}>{r.total}</td>
-                                        <td style={{ padding: '0.5rem', textAlign: 'right', fontWeight: 700, color: r.win_rate >= 0.6 ? 'var(--accent-green)' : r.win_rate <= 0.4 ? 'var(--accent-red)' : 'var(--text-primary)' }}>
+                                        <td style={{ padding: '0.5rem', textAlign: 'right', fontWeight: 700, fontFamily: 'monospace', fontSize: '0.9rem', color: (r.rating ?? 1500) >= 1550 ? 'var(--accent-green)' : (r.rating ?? 1500) <= 1450 ? 'var(--accent-red)' : 'var(--text-primary)' }}>
+                                            {r.rating ?? '—'}
+                                        </td>
+                                        <td style={{ padding: '0.5rem', textAlign: 'right', color: 'var(--text-muted)', fontSize: '0.8rem' }}>
                                             {(r.win_rate * 100).toFixed(1)}%
                                         </td>
                                     </tr>

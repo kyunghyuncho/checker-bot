@@ -707,7 +707,52 @@ async def api_tournament(req: TournamentRequest, background_tasks: BackgroundTas
                     main_loop
                 )
 
-        # Build rankings sorted by win rate
+        # ── Fit Bradley-Terry ranking model ──────────────────────────
+        # MLE iterative algorithm: r_i = W_i / Σ_j (n_ij / (r_i + r_j))
+        # where W_i = total wins for model i, n_ij = games between i and j
+        # Draws count as 0.5 win for each side.
+
+        # Build win matrix from pair_stats
+        idx_map = {mid: i for i, mid in enumerate(model_ids)}
+        n = len(model_ids)
+        win_matrix = [[0.0] * n for _ in range(n)]
+
+        for key, ps in pair_stats.items():
+            ri = idx_map[ps["red_id"]]
+            wi = idx_map[ps["white_id"]]
+            # Red wins count as wins for red model
+            win_matrix[ri][wi] += ps["red_wins"] + 0.5 * ps["draws"]
+            win_matrix[wi][ri] += ps["white_wins"] + 0.5 * ps["draws"]
+
+        # Iterative BT fitting (50 iterations is more than enough)
+        ratings = [1.0] * n
+        for _ in range(50):
+            new_ratings = [0.0] * n
+            for i in range(n):
+                w_i = sum(win_matrix[i])
+                if w_i == 0:
+                    new_ratings[i] = ratings[i]
+                    continue
+                denom = 0.0
+                for j in range(n):
+                    if i == j:
+                        continue
+                    n_ij = win_matrix[i][j] + win_matrix[j][i]
+                    if n_ij > 0:
+                        denom += n_ij / (ratings[i] + ratings[j])
+                new_ratings[i] = w_i / denom if denom > 0 else ratings[i]
+            # Normalize so geometric mean = 1
+            import math
+            geo_mean = math.exp(sum(math.log(max(r, 1e-10)) for r in new_ratings) / n)
+            ratings = [r / geo_mean for r in new_ratings]
+
+        # Convert to Elo scale: Elo = 1500 + 400 * log10(rating)
+        import math
+        elo_ratings = {}
+        for i, mid in enumerate(model_ids):
+            elo_ratings[mid] = round(1500 + 400 * math.log10(max(ratings[i], 1e-10)))
+
+        # Build rankings sorted by BT rating
         rankings = []
         for mid in model_ids:
             t = model_totals[mid]
@@ -720,9 +765,10 @@ async def api_tournament(req: TournamentRequest, background_tasks: BackgroundTas
                 "losses": t["losses"],
                 "draws": t["draws"],
                 "total": total_games,
-                "win_rate": round(win_rate, 3)
+                "win_rate": round(win_rate, 3),
+                "rating": elo_ratings[mid]
             })
-        rankings.sort(key=lambda r: r["win_rate"], reverse=True)
+        rankings.sort(key=lambda r: r["rating"], reverse=True)
 
         # Send final results
         for ws in active_websockets:
