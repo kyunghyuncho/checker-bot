@@ -126,7 +126,7 @@ class TrainRequest(BaseModel):
     batch_size: int = 32                          # Training batch size
     val_split: float = 0.1                        # Fraction of data for validation
     patience: int = 5                             # Early stopping patience (0 = disabled)
-    discount_factor: float = 0.05                  # Label discounting γ: 0=none, 1=max
+    discount_factor: float = 0.0                  # Label discounting γ: 0=none, 1=max
 
 
 class InferRequest(BaseModel):
@@ -604,6 +604,19 @@ async def api_tournament(req: TournamentRequest, background_tasks: BackgroundTas
 
     model_ids = [m["id"] for m in models]
     model_names = {m["id"]: m.get("name", m["id"]) for m in models}
+    # Capture hyperparameters for tooltip display
+    model_meta = {}
+    for m in models:
+        model_meta[m["id"]] = {
+            "hidden_dims": m.get("hidden_dims"),
+            "num_conv_layers": m.get("num_conv_layers"),
+            "dropout_rate": m.get("dropout_rate"),
+            "learning_rate": m.get("learning_rate"),
+            "epochs_trained": m.get("epochs_trained"),
+            "batch_size": m.get("batch_size"),
+            "final_train_loss": m.get("final_train_loss"),
+            "final_val_loss": m.get("final_val_loss"),
+        }
 
     # Capture the event loop for cross-thread WebSocket broadcasting
     main_loop = asyncio.get_running_loop()
@@ -776,7 +789,8 @@ async def api_tournament(req: TournamentRequest, background_tasks: BackgroundTas
                 ws.send_text(json.dumps({
                     "type": "tournament_complete",
                     "rankings": rankings,
-                    "head_to_head": pair_stats
+                    "head_to_head": pair_stats,
+                    "model_meta": model_meta
                 })),
                 main_loop
             )

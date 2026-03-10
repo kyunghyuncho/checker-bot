@@ -36,6 +36,36 @@ interface H2HEntry {
     draws: number;
 }
 
+interface ModelMeta {
+    hidden_dims?: number;
+    num_conv_layers?: number;
+    dropout_rate?: number;
+    learning_rate?: number;
+    epochs_trained?: number;
+    batch_size?: number;
+    final_train_loss?: number;
+    final_val_loss?: number;
+}
+
+const ModelTooltip = ({ name, meta }: { name: string; meta?: ModelMeta }) => {
+    if (!meta) return <>{name}</>;
+    return (
+        <span style={{ position: 'relative', cursor: 'help', borderBottom: '1px dotted var(--text-muted)' }} className="model-tooltip">
+            {name}
+            <span className="model-tooltip-content">
+                <strong>{name}</strong>
+                <br />Layers: {meta.num_conv_layers ?? '?'} × {meta.hidden_dims ?? '?'}ch
+                <br />Dropout: {meta.dropout_rate ?? '?'}
+                <br />LR: {meta.learning_rate ?? '?'}
+                <br />Epochs: {meta.epochs_trained ?? '?'}
+                <br />Batch: {meta.batch_size ?? '?'}
+                {meta.final_train_loss != null && <><br />Train loss: {meta.final_train_loss}</>}
+                {meta.final_val_loss != null && <><br />Val loss: {meta.final_val_loss}</>}
+            </span>
+        </span>
+    );
+};
+
 export const Tournament = () => {
     const [numGames, setNumGames] = useState(20);
     const [depth, setDepth] = useState(2);
@@ -45,6 +75,7 @@ export const Tournament = () => {
     const [progress, setProgress] = useState<ProgressUpdate | null>(null);
     const [rankings, setRankings] = useState<RankingEntry[]>([]);
     const [h2h, setH2h] = useState<Record<string, H2HEntry>>({});
+    const [modelMeta, setModelMeta] = useState<Record<string, ModelMeta>>({});
     const [liveStandings, setLiveStandings] = useState<RankingEntry[]>([]);
     const [log, setLog] = useState<string[]>([]);
     const [error, setError] = useState('');
@@ -59,6 +90,7 @@ export const Tournament = () => {
                 if (data.rankings) setRankings(data.rankings);
                 if (data.h2h) setH2h(data.h2h);
                 if (data.log) setLog(data.log);
+                if (data.modelMeta) setModelMeta(data.modelMeta);
             }
         } catch { /* ignore parse errors */ }
     }, []);
@@ -66,9 +98,9 @@ export const Tournament = () => {
     // Save results to sessionStorage whenever they change
     useEffect(() => {
         if (rankings.length > 0) {
-            sessionStorage.setItem('tournament_results', JSON.stringify({ rankings, h2h, log }));
+            sessionStorage.setItem('tournament_results', JSON.stringify({ rankings, h2h, log, modelMeta }));
         }
-    }, [rankings, h2h, log]);
+    }, [rankings, h2h, log, modelMeta]);
 
     // WebSocket listener for tournament events
     useEffect(() => {
@@ -82,6 +114,7 @@ export const Tournament = () => {
             } else if (data.type === 'tournament_complete') {
                 setRankings(data.rankings);
                 setH2h(data.head_to_head);
+                if (data.model_meta) setModelMeta(data.model_meta);
                 setRunning(false);
                 setLog(prev => [...prev, `🏆 Tournament complete!`]);
             }
@@ -98,6 +131,7 @@ export const Tournament = () => {
         setRunning(true);
         setRankings([]);
         setH2h({});
+        setModelMeta({});
         setLiveStandings([]);
         setLog([]);
         setProgress(null);
@@ -130,6 +164,7 @@ export const Tournament = () => {
     const handleReset = () => {
         setRankings([]);
         setH2h({});
+        setModelMeta({});
         setLiveStandings([]);
         setLog([]);
         setProgress(null);
@@ -248,7 +283,7 @@ export const Tournament = () => {
                                 {liveStandings.map((r, idx) => (
                                     <tr key={r.model_id} style={{ borderBottom: '1px solid var(--glass-border)' }}>
                                         <td style={{ padding: '0.5rem', fontWeight: 600, color: 'var(--text-muted)' }}>{idx + 1}</td>
-                                        <td style={{ padding: '0.5rem', fontWeight: 600 }}>{r.name}</td>
+                                        <td style={{ padding: '0.5rem', fontWeight: 600 }}><ModelTooltip name={r.name} meta={modelMeta[r.model_id]} /></td>
                                         <td style={{ padding: '0.5rem', textAlign: 'center', color: 'var(--accent-green)' }}>{r.wins}</td>
                                         <td style={{ padding: '0.5rem', textAlign: 'center', color: 'var(--accent-red)' }}>{r.losses}</td>
                                         <td style={{ padding: '0.5rem', textAlign: 'center', color: 'var(--text-muted)' }}>{r.draws}</td>
@@ -293,7 +328,7 @@ export const Tournament = () => {
                                         <td style={{ padding: '0.5rem', fontWeight: 700, color: idx === 0 ? '#f59e0b' : idx === 1 ? '#94a3b8' : idx === 2 ? '#cd7f32' : 'var(--text-muted)' }}>
                                             {idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : idx + 1}
                                         </td>
-                                        <td style={{ padding: '0.5rem', fontWeight: 600 }}>{r.name}</td>
+                                        <td style={{ padding: '0.5rem', fontWeight: 600 }}><ModelTooltip name={r.name} meta={modelMeta[r.model_id]} /></td>
                                         <td style={{ padding: '0.5rem', textAlign: 'center', color: 'var(--accent-green)' }}>{r.wins}</td>
                                         <td style={{ padding: '0.5rem', textAlign: 'center', color: 'var(--accent-red)' }}>{r.losses}</td>
                                         <td style={{ padding: '0.5rem', textAlign: 'center', color: 'var(--text-muted)' }}>{r.draws}</td>
