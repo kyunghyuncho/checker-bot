@@ -18,6 +18,7 @@
  */
 import { useEffect, useState } from 'react';
 import { Box, Trash2 } from 'lucide-react';
+import { ModelTooltip } from './ModelTooltip';
 
 interface ModelMeta {
     id: string;
@@ -28,6 +29,7 @@ interface ModelMeta {
     dropout_rate: number;
     learning_rate: number;
     batch_size: number;
+    discount_factor?: number;
     final_train_loss?: number;
     final_val_loss?: number;
 }
@@ -152,7 +154,10 @@ export const ModelRegistry: React.FC<ModelRegistryProps> = ({ blackModelId, whit
                                 {/* Model info */}
                                 <div style={{ flex: 1, minWidth: 0 }}>
                                     <div style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-primary)' }}>
-                                        {m.num_conv_layers}L / {m.hidden_dims}d / dr{m.dropout_rate}
+                                        <ModelTooltip name={m.id} meta={m as any} />
+                                        <span style={{ fontWeight: 'normal', color: 'var(--text-muted)', marginLeft: '0.5rem' }}>
+                                            ({m.num_conv_layers}L / {m.hidden_dims}d / dr{m.dropout_rate})
+                                        </span>
                                     </div>
                                     <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
                                         <span>{m.epochs_trained}ep</span>

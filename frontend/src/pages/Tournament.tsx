@@ -6,6 +6,8 @@
  */
 import { useState, useEffect, useRef } from 'react';
 import { Trophy, Play } from 'lucide-react';
+import { ModelTooltip } from '../components/ModelTooltip';
+import type { ModelMeta } from '../components/ModelTooltip';
 
 interface RankingEntry {
     model_id: string;
@@ -35,38 +37,6 @@ interface H2HEntry {
     white_wins: number;
     draws: number;
 }
-
-interface ModelMeta {
-    hidden_dims?: number;
-    num_conv_layers?: number;
-    dropout_rate?: number;
-    learning_rate?: number;
-    discount_factor?: number;
-    epochs_trained?: number;
-    batch_size?: number;
-    final_train_loss?: number;
-    final_val_loss?: number;
-}
-
-const ModelTooltip = ({ name, meta }: { name: string; meta?: ModelMeta }) => {
-    if (!meta) return <>{name}</>;
-    return (
-        <span style={{ position: 'relative', cursor: 'help', borderBottom: '1px dotted var(--text-muted)' }} className="model-tooltip">
-            {name}
-            <span className="model-tooltip-content">
-                <strong>{name}</strong>
-                <br />Layers: {meta.num_conv_layers ?? '?'} × {meta.hidden_dims ?? '?'}ch
-                <br />Dropout: {meta.dropout_rate ?? '?'}
-                <br />LR: {meta.learning_rate ?? '?'}
-                <br />Discount γ: {meta.discount_factor ?? '?'}
-                <br />Epochs: {meta.epochs_trained ?? '?'}
-                <br />Batch: {meta.batch_size ?? '?'}
-                {meta.final_train_loss != null && <><br />Train loss: {meta.final_train_loss}</>}
-                {meta.final_val_loss != null && <><br />Val loss: {meta.final_val_loss}</>}
-            </span>
-        </span>
-    );
-};
 
 export const Tournament = () => {
     const [numGames, setNumGames] = useState(20);
