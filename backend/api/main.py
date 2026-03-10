@@ -603,7 +603,10 @@ async def api_tournament(req: TournamentRequest, background_tasks: BackgroundTas
         raise HTTPException(status_code=400, detail="Need at least 2 models for a tournament.")
 
     model_ids = [m["id"] for m in models]
-    model_names = {m["id"]: m.get("name", m["id"][:8]) for m in models}
+    model_names = {m["id"]: m.get("name", m["id"]) for m in models}
+
+    # Capture the event loop for cross-thread WebSocket broadcasting
+    main_loop = asyncio.get_running_loop()
 
     def _run_tournament():
         import random as rng
