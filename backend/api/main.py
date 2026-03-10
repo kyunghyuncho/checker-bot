@@ -580,6 +580,135 @@ async def websocket_endpoint(websocket: WebSocket):
         active_websockets.remove(websocket)
 
 
+# ── AI Tournament ────────────────────────────────────────────────────
+
+class TournamentRequest(BaseModel):
+    """Parameters for running an AI tournament."""
+    num_games: int = 20                   # Total number of games to play
+    depth: int = 2                        # Minimax search depth per move
+    temperature: float = 1.0              # Softmax temperature for move sampling
+
+
+@app.post("/api/tournament")
+async def api_tournament(req: TournamentRequest, background_tasks: BackgroundTasks):
+    """
+    Run a round-robin AI tournament in the background.
+    Randomly pairs models for each game, collects win/loss/draw stats,
+    and streams progress + final results via WebSocket.
+    """
+    models = _get_model_list()
+    if len(models) < 2:
+        raise HTTPException(status_code=400, detail="Need at least 2 models for a tournament.")
+
+    model_ids = [m["id"] for m in models]
+    model_names = {m["id"]: m.get("name", m["id"][:8]) for m in models}
+
+    def _run_tournament():
+        import random as rng
+        from backend.engine.board import CheckersBoard
+        from backend.engine.minimax import get_best_move
+
+        # Initialize per-pair stats: {(red_id, white_id): {wins, losses, draws}}
+        pair_stats: dict = {}
+        model_totals: dict = {mid: {"wins": 0, "losses": 0, "draws": 0} for mid in model_ids}
+
+        for game_idx in range(req.num_games):
+            # Pick two distinct random models
+            red_id, white_id = rng.sample(model_ids, 2)
+            red_model = _load_model_by_id(red_id)
+            white_model = _load_model_by_id(white_id)
+
+            pair_key = f"{red_id}_vs_{white_id}"
+            if pair_key not in pair_stats:
+                pair_stats[pair_key] = {"red_id": red_id, "white_id": white_id, "red_wins": 0, "white_wins": 0, "draws": 0}
+
+            # Play a game
+            board = CheckersBoard()
+            move_count = 0
+            max_moves = 200
+            winner = None
+
+            while True:
+                winner = board.check_game_over()
+                if winner is not None:
+                    break
+                if move_count > max_moves:
+                    winner = 0
+                    break
+
+                # Pick the right model for the current player
+                current_model = red_model if board.current_turn == 1 else white_model
+                move = get_best_move(board, req.depth, req.temperature, model=current_model)
+
+                if move:
+                    board.make_move(move)
+                    move_count += 1
+                else:
+                    winner = 2 if board.current_turn == 1 else 1
+                    break
+
+            # Record result
+            if winner == 1:  # Red won
+                pair_stats[pair_key]["red_wins"] += 1
+                model_totals[red_id]["wins"] += 1
+                model_totals[white_id]["losses"] += 1
+            elif winner == 2:  # White won
+                pair_stats[pair_key]["white_wins"] += 1
+                model_totals[white_id]["wins"] += 1
+                model_totals[red_id]["losses"] += 1
+            else:  # Draw
+                pair_stats[pair_key]["draws"] += 1
+                model_totals[red_id]["draws"] += 1
+                model_totals[white_id]["draws"] += 1
+
+            # Stream progress
+            result_label = "Red" if winner == 1 else "White" if winner == 2 else "Draw"
+            for ws in active_websockets:
+                asyncio.run_coroutine_threadsafe(
+                    ws.send_text(json.dumps({
+                        "type": "tournament_progress",
+                        "game": game_idx + 1,
+                        "total": req.num_games,
+                        "red": model_names[red_id],
+                        "white": model_names[white_id],
+                        "result": result_label,
+                        "moves": move_count
+                    })),
+                    main_loop
+                )
+
+        # Build rankings sorted by win rate
+        rankings = []
+        for mid in model_ids:
+            t = model_totals[mid]
+            total_games = t["wins"] + t["losses"] + t["draws"]
+            win_rate = t["wins"] / total_games if total_games > 0 else 0.0
+            rankings.append({
+                "model_id": mid,
+                "name": model_names[mid],
+                "wins": t["wins"],
+                "losses": t["losses"],
+                "draws": t["draws"],
+                "total": total_games,
+                "win_rate": round(win_rate, 3)
+            })
+        rankings.sort(key=lambda r: r["win_rate"], reverse=True)
+
+        # Send final results
+        for ws in active_websockets:
+            asyncio.run_coroutine_threadsafe(
+                ws.send_text(json.dumps({
+                    "type": "tournament_complete",
+                    "rankings": rankings,
+                    "head_to_head": pair_stats
+                })),
+                main_loop
+            )
+
+    background_tasks.add_task(_run_tournament)
+    return {"message": f"Tournament started: {req.num_games} games among {len(model_ids)} models."}
+
+
 # ── Model Registry ───────────────────────────────────────────────────
 
 @app.get("/api/models")

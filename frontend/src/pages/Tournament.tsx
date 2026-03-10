@@ -1,0 +1,266 @@
+/**
+ * Tournament.tsx — AI Tournament Page
+ * =====================================
+ * Lets N trained models compete in M random games.
+ * Displays live progress, final rankings, and head-to-head results.
+ */
+import { useState, useEffect, useRef } from 'react';
+import { Trophy, Play, Loader } from 'lucide-react';
+
+interface RankingEntry {
+    model_id: string;
+    name: string;
+    wins: number;
+    losses: number;
+    draws: number;
+    total: number;
+    win_rate: number;
+}
+
+interface ProgressUpdate {
+    game: number;
+    total: number;
+    red: string;
+    white: string;
+    result: string;
+    moves: number;
+}
+
+interface H2HEntry {
+    red_id: string;
+    white_id: string;
+    red_wins: number;
+    white_wins: number;
+    draws: number;
+}
+
+export const Tournament = () => {
+    const [numGames, setNumGames] = useState(20);
+    const [depth, setDepth] = useState(2);
+    const [temperature, setTemperature] = useState(1.0);
+    const [running, setRunning] = useState(false);
+    const [progress, setProgress] = useState<ProgressUpdate | null>(null);
+    const [rankings, setRankings] = useState<RankingEntry[]>([]);
+    const [h2h, setH2h] = useState<Record<string, H2HEntry>>({});
+    const [log, setLog] = useState<string[]>([]);
+    const [error, setError] = useState('');
+    const logRef = useRef<HTMLDivElement>(null);
+
+    // WebSocket listener for tournament events
+    useEffect(() => {
+        const ws = new WebSocket('ws://localhost:8000/ws/metrics');
+        ws.onmessage = (event) => {
+            const data = JSON.parse(event.data);
+            if (data.type === 'tournament_progress') {
+                setProgress(data);
+                setLog(prev => [...prev, `Game ${data.game}/${data.total}: ${data.red} (Red) vs ${data.white} (White) → ${data.result} (${data.moves} moves)`]);
+            } else if (data.type === 'tournament_complete') {
+                setRankings(data.rankings);
+                setH2h(data.head_to_head);
+                setRunning(false);
+                setLog(prev => [...prev, `🏆 Tournament complete!`]);
+            }
+        };
+        return () => ws.close();
+    }, []);
+
+    // Auto-scroll log
+    useEffect(() => {
+        if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight;
+    }, [log]);
+
+    const handleStart = async () => {
+        setRunning(true);
+        setRankings([]);
+        setH2h({});
+        setLog([]);
+        setProgress(null);
+        setError('');
+        try {
+            const res = await fetch('http://localhost:8000/api/tournament', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ num_games: numGames, depth, temperature })
+            });
+            if (!res.ok) {
+                const errData = await res.json();
+                setError(errData.detail || 'Failed to start tournament');
+                setRunning(false);
+            }
+        } catch (e: any) {
+            setError(e.message || 'Connection error');
+            setRunning(false);
+        }
+    };
+
+    // Build unique model list for H2H matrix
+    const modelIds = [...new Set(rankings.map(r => r.model_id))];
+    const modelNames: Record<string, string> = {};
+    rankings.forEach(r => { modelNames[r.model_id] = r.name; });
+
+    // Lookup H2H result for a given pair
+    const getH2H = (redId: string, whiteId: string) => {
+        const key = `${redId}_vs_${whiteId}`;
+        return h2h[key] || null;
+    };
+
+    return (
+        <div style={{ display: 'grid', gridTemplateColumns: '300px 1fr', gap: '1.5rem', alignItems: 'start' }}>
+            {/* Left: Controls */}
+            <div className="panel">
+                <h2 style={{ fontSize: '1rem', marginBottom: '1rem' }}><Trophy size={20} /> AI Tournament</h2>
+
+                <div className="input-group">
+                    <label>Total Games <span>{numGames}</span></label>
+                    <input type="range" min="5" max="200" step="5" value={numGames} onChange={(e) => setNumGames(Number(e.target.value))} />
+                </div>
+                <div className="input-group">
+                    <label>Search Depth <span>{depth}</span></label>
+                    <input type="range" min="1" max="6" value={depth} onChange={(e) => setDepth(Number(e.target.value))} />
+                </div>
+                <div className="input-group">
+                    <label>Temperature τ <span>{temperature.toFixed(1)}</span></label>
+                    <input type="range" min="0" max="5" step="0.1" value={temperature} onChange={(e) => setTemperature(Number(e.target.value))} />
+                </div>
+
+                <button
+                    className="primary"
+                    onClick={handleStart}
+                    disabled={running}
+                    style={{ width: '100%', marginTop: '0.75rem', display: 'flex', justifyContent: 'center', gap: '0.5rem' }}
+                >
+                    {running ? <><Loader size={18} className="spin" /> Running...</> : <><Play size={18} /> Run Tournament</>}
+                </button>
+
+                {error && (
+                    <div style={{ marginTop: '0.75rem', padding: '0.5rem', borderRadius: '0.5rem', backgroundColor: 'rgba(239,68,68,0.1)', border: '1px solid var(--accent-red)', color: 'var(--accent-red)', fontSize: '0.85rem', textAlign: 'center' }}>
+                        {error}
+                    </div>
+                )}
+
+                {/* Progress */}
+                {progress && running && (
+                    <div style={{ marginTop: '1rem' }}>
+                        <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.25rem' }}>
+                            Progress
+                        </div>
+                        <div style={{ height: '6px', borderRadius: '3px', backgroundColor: 'var(--bg-primary)', overflow: 'hidden' }}>
+                            <div style={{ width: `${(progress.game / progress.total) * 100}%`, height: '100%', borderRadius: '3px', backgroundColor: 'var(--accent-blue)', transition: 'width 0.3s' }} />
+                        </div>
+                        <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '0.25rem', textAlign: 'center' }}>
+                            {progress.game} / {progress.total}
+                        </div>
+                    </div>
+                )}
+
+                {/* Game log */}
+                <div ref={logRef} style={{ marginTop: '1rem', maxHeight: '250px', overflowY: 'auto', fontSize: '0.75rem', color: 'var(--text-muted)', fontFamily: 'monospace', lineHeight: 1.6, backgroundColor: 'var(--bg-primary)', borderRadius: '0.5rem', padding: '0.5rem' }}>
+                    {log.length === 0 ? 'Run a tournament to see results...' : log.map((l, i) => <div key={i}>{l}</div>)}
+                </div>
+            </div>
+
+            {/* Right: Results */}
+            <div>
+                {/* Rankings table */}
+                {rankings.length > 0 && (
+                    <div className="panel" style={{ marginBottom: '1.5rem' }}>
+                        <h2 style={{ fontSize: '1rem', marginBottom: '0.75rem' }}><Trophy size={18} /> Rankings</h2>
+                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+                            <thead>
+                                <tr style={{ borderBottom: '1px solid var(--border-color)', color: 'var(--text-muted)', textTransform: 'uppercase', fontSize: '0.7rem', letterSpacing: '0.05em' }}>
+                                    <th style={{ textAlign: 'left', padding: '0.5rem' }}>#</th>
+                                    <th style={{ textAlign: 'left', padding: '0.5rem' }}>Model</th>
+                                    <th style={{ textAlign: 'center', padding: '0.5rem' }}>W</th>
+                                    <th style={{ textAlign: 'center', padding: '0.5rem' }}>L</th>
+                                    <th style={{ textAlign: 'center', padding: '0.5rem' }}>D</th>
+                                    <th style={{ textAlign: 'center', padding: '0.5rem' }}>Games</th>
+                                    <th style={{ textAlign: 'right', padding: '0.5rem' }}>Win Rate</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {rankings.map((r, idx) => (
+                                    <tr key={r.model_id} style={{ borderBottom: '1px solid var(--glass-border)' }}>
+                                        <td style={{ padding: '0.5rem', fontWeight: 700, color: idx === 0 ? '#f59e0b' : idx === 1 ? '#94a3b8' : idx === 2 ? '#cd7f32' : 'var(--text-muted)' }}>
+                                            {idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : idx + 1}
+                                        </td>
+                                        <td style={{ padding: '0.5rem', fontWeight: 600 }}>{r.name}</td>
+                                        <td style={{ padding: '0.5rem', textAlign: 'center', color: 'var(--accent-green)' }}>{r.wins}</td>
+                                        <td style={{ padding: '0.5rem', textAlign: 'center', color: 'var(--accent-red)' }}>{r.losses}</td>
+                                        <td style={{ padding: '0.5rem', textAlign: 'center', color: 'var(--text-muted)' }}>{r.draws}</td>
+                                        <td style={{ padding: '0.5rem', textAlign: 'center' }}>{r.total}</td>
+                                        <td style={{ padding: '0.5rem', textAlign: 'right', fontWeight: 700, color: r.win_rate >= 0.6 ? 'var(--accent-green)' : r.win_rate <= 0.4 ? 'var(--accent-red)' : 'var(--text-primary)' }}>
+                                            {(r.win_rate * 100).toFixed(1)}%
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                )}
+
+                {/* Head-to-head matrix */}
+                {rankings.length > 0 && modelIds.length > 1 && (
+                    <div className="panel">
+                        <h2 style={{ fontSize: '1rem', marginBottom: '0.75rem' }}>Head-to-Head Matrix</h2>
+                        <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.75rem' }}>
+                            Each cell shows <span style={{ color: 'var(--piece-red)' }}>Red wins</span> / <span style={{ color: 'var(--text-muted)' }}>Draws</span> / <span style={{ color: 'var(--text-secondary)' }}>White wins</span> (row = Red, col = White)
+                        </p>
+                        <div style={{ overflowX: 'auto' }}>
+                            <table style={{ borderCollapse: 'collapse', fontSize: '0.8rem' }}>
+                                <thead>
+                                    <tr>
+                                        <th style={{ padding: '0.4rem', fontSize: '0.7rem', color: 'var(--text-muted)' }}>Red ↓ / White →</th>
+                                        {modelIds.map(id => (
+                                            <th key={id} style={{ padding: '0.4rem', fontSize: '0.7rem', color: 'var(--text-muted)', maxWidth: '80px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                                {modelNames[id]}
+                                            </th>
+                                        ))}
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {modelIds.map(redId => (
+                                        <tr key={redId}>
+                                            <td style={{ padding: '0.4rem', fontWeight: 600, fontSize: '0.75rem', whiteSpace: 'nowrap' }}>{modelNames[redId]}</td>
+                                            {modelIds.map(whiteId => {
+                                                if (redId === whiteId) {
+                                                    return <td key={whiteId} style={{ padding: '0.4rem', textAlign: 'center', backgroundColor: 'var(--bg-primary)', borderRadius: '0.25rem' }}>—</td>;
+                                                }
+                                                const h = getH2H(redId, whiteId);
+                                                if (!h) {
+                                                    return <td key={whiteId} style={{ padding: '0.4rem', textAlign: 'center', color: 'var(--text-muted)' }}>·</td>;
+                                                }
+                                                const total = h.red_wins + h.white_wins + h.draws;
+                                                const redPct = total > 0 ? h.red_wins / total : 0;
+                                                return (
+                                                    <td key={whiteId} style={{
+                                                        padding: '0.4rem',
+                                                        textAlign: 'center',
+                                                        borderRadius: '0.25rem',
+                                                        backgroundColor: redPct > 0.6 ? 'rgba(239,68,68,0.15)' : redPct < 0.4 ? 'rgba(59,130,246,0.15)' : 'var(--bg-primary)'
+                                                    }}>
+                                                        <span style={{ color: 'var(--piece-red)' }}>{h.red_wins}</span>
+                                                        <span style={{ color: 'var(--text-muted)' }}> / {h.draws} / </span>
+                                                        <span style={{ color: 'var(--text-secondary)' }}>{h.white_wins}</span>
+                                                    </td>
+                                                );
+                                            })}
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                )}
+
+                {/* Empty state */}
+                {rankings.length === 0 && !running && (
+                    <div className="panel" style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>
+                        <Trophy size={48} style={{ opacity: 0.3, marginBottom: '1rem' }} />
+                        <p style={{ fontSize: '1.1rem', fontWeight: 600 }}>No tournament results yet</p>
+                        <p style={{ fontSize: '0.85rem', marginTop: '0.25rem' }}>Train 2+ models, then run a tournament to see rankings</p>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+};

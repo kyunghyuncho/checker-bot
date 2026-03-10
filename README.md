@@ -21,6 +21,7 @@ Built with **PyTorch Lightning** and **FastAPI** on the backend, and **Vite**, *
 - **Game Monitor** — Real-time statistics panel below the board showing piece counts, material advantage, legal move count, and two sparkline charts: material balance and CNN win probability over time.
 - **Configurable Search Depth** — Adjust the minimax search depth (1–8) for interactive play.
 - **Data Inspector** — Browse generated game data move-by-move with an interactive board viewer.
+- **AI Tournament** — Pit N trained models against each other in M random games. View rankings with win rates and a color-coded head-to-head matrix.
 - **Collapsible Panels** — Data generation and training controls collapse to save space.
 
 ## Architecture
@@ -38,7 +39,8 @@ checker-bot/
 ├── frontend/
 │   ├── src/pages/
 │   │   ├── Game.tsx               # Main dashboard (board + controls + brain)
-│   │   └── DataInspector.tsx      # Dataset viewer page
+│   │   ├── DataInspector.tsx      # Dataset viewer page
+│   │   └── Tournament.tsx        # AI tournament with rankings & H2H matrix
 │   ├── src/components/
 │   │   ├── Board.tsx              # Interactive drag-and-drop board (DnD Kit)
 │   │   ├── BrainVisualizer.tsx    # Dual CNN win probability display

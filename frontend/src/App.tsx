@@ -2,13 +2,14 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom';
 import { Game } from './pages/Game';
 import { DataInspector } from './pages/DataInspector';
-import { BrainCircuit, Database } from 'lucide-react';
+import { Tournament } from './pages/Tournament';
+import { BrainCircuit, Database, Trophy } from 'lucide-react';
 import './index.css';
 
 // Educational Layout Component
 const Layout = ({ children }: { children: React.ReactNode }) => {
   const location = useLocation();
-  
+
   return (
     <div className="app-container">
       <header className="panel" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -18,29 +19,40 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
             Interactive educational platform for training a two-headed CNN
           </p>
         </div>
-        
+
         <nav style={{ display: 'flex', gap: '1rem' }}>
-          <Link 
-            to="/" 
-            style={{ 
-              display: 'flex', alignItems: 'center', gap: '0.5rem', 
-              textDecoration: 'none', 
+          <Link
+            to="/"
+            style={{
+              display: 'flex', alignItems: 'center', gap: '0.5rem',
+              textDecoration: 'none',
               color: location.pathname === '/' ? 'var(--accent-blue)' : 'var(--text-primary)',
               fontWeight: location.pathname === '/' ? '600' : '400'
             }}
           >
             <BrainCircuit size={20} /> Play & Train
           </Link>
-          <Link 
-            to="/inspector" 
-            style={{ 
-              display: 'flex', alignItems: 'center', gap: '0.5rem', 
+          <Link
+            to="/inspector"
+            style={{
+              display: 'flex', alignItems: 'center', gap: '0.5rem',
               textDecoration: 'none',
               color: location.pathname === '/inspector' ? 'var(--accent-purple)' : 'var(--text-primary)',
               fontWeight: location.pathname === '/inspector' ? '600' : '400'
             }}
           >
             <Database size={20} /> Data Inspector
+          </Link>
+          <Link
+            to="/tournament"
+            style={{
+              display: 'flex', alignItems: 'center', gap: '0.5rem',
+              textDecoration: 'none',
+              color: location.pathname === '/tournament' ? '#f59e0b' : 'var(--text-primary)',
+              fontWeight: location.pathname === '/tournament' ? '600' : '400'
+            }}
+          >
+            <Trophy size={20} /> Tournament
           </Link>
         </nav>
       </header>
@@ -59,6 +71,7 @@ function App() {
         <Routes>
           <Route path="/" element={<Game />} />
           <Route path="/inspector" element={<DataInspector />} />
+          <Route path="/tournament" element={<Tournament />} />
         </Routes>
       </Layout>
     </Router>
