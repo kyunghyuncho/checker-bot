@@ -54,7 +54,8 @@ export const Game = () => {
     const [whiteModelId, setWhiteModelId] = useState<string | null>(null);
     const [cnnProbabilities, setCnnProbabilities] = useState<{ p_black: number, p_white: number } | null>(null);
     const [gameOver, setGameOver] = useState<number | null>(null);
-    const [epsilon, setEpsilon] = useState(0.05);
+    const [epsilon, setEpsilon] = useState(0.0);
+    const [searchDepth, setSearchDepth] = useState(4);
     const [isPlaying, setIsPlaying] = useState(false);
 
     const handleReset = () => {
@@ -105,9 +106,15 @@ export const Game = () => {
                 </div>
                 <div className="edu-note" style={{ width: '100%', marginTop: 0, marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
                     <div><strong>Mode:</strong> {modeLabel}</div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginLeft: 'auto', fontSize: '0.8rem' }}>
-                        <label style={{ whiteSpace: 'nowrap' }}>ε {epsilon.toFixed(2)}</label>
-                        <input type="range" min="0" max="0.3" step="0.01" value={epsilon} onChange={(e) => setEpsilon(Number(e.target.value))} style={{ width: '80px' }} />
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginLeft: 'auto', fontSize: '0.8rem' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                            <label style={{ whiteSpace: 'nowrap' }}>Depth: {searchDepth}</label>
+                            <input type="range" min="1" max="8" step="1" value={searchDepth} onChange={(e) => setSearchDepth(Number(e.target.value))} style={{ width: '80px' }} />
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                            <label style={{ whiteSpace: 'nowrap' }}>ε {epsilon.toFixed(2)}</label>
+                            <input type="range" min="0" max="0.3" step="0.01" value={epsilon} onChange={(e) => setEpsilon(Number(e.target.value))} style={{ width: '80px' }} />
+                        </div>
                     </div>
                 </div>
 
@@ -117,6 +124,7 @@ export const Game = () => {
                     blackModelId={blackModelId}
                     whiteModelId={whiteModelId}
                     epsilon={epsilon}
+                    searchDepth={searchDepth}
                     isPlaying={isPlaying}
                     setGrid={setBoardState}
                     setCurrentTurn={setCurrentTurn}

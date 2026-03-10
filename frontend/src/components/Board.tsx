@@ -50,6 +50,7 @@ interface BoardProps {
     blackModelId: string | null;
     whiteModelId: string | null;
     epsilon: number;
+    searchDepth: number;
     isPlaying: boolean;
     setGrid: (grid: number[][]) => void;
     setCurrentTurn: (turn: number) => void;
@@ -159,7 +160,7 @@ const DroppableSquare = ({ r, c, piece, currentTurn, isHumanTurn }: { r: number,
 // Main Board Component
 // ----------------------------------------------------
 export const Board: React.FC<BoardProps> = ({
-    grid, currentTurn, blackModelId, whiteModelId, epsilon, isPlaying, setGrid, setCurrentTurn, setCnnProbabilities, gameOver, setGameOver
+    grid, currentTurn, blackModelId, whiteModelId, epsilon, searchDepth, isPlaying, setGrid, setCurrentTurn, setCnnProbabilities, gameOver, setGameOver
 }) => {
     const sensors = useSensors(
         useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
@@ -241,7 +242,7 @@ export const Board: React.FC<BoardProps> = ({
                     body: JSON.stringify({
                         board_state: grid,
                         current_turn: currentTurn,
-                        depth: 4,
+                        depth: searchDepth,
                         model_id: modelId,
                         epsilon: epsilon
                     })
