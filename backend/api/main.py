@@ -263,6 +263,14 @@ async def api_train(req: TrainRequest, background_tasks: BackgroundTasks):
     def _run_train():
         global is_training
         is_training = True
+        
+        # Notify the frontend immediately so it can reset the metrics chart
+        for ws in active_websockets:
+            asyncio.run_coroutine_threadsafe(
+                ws.send_text(json.dumps({"type": "training_started", "message": "Initializing training..."})),
+                main_loop
+            )
+
         try:
             # ── 1. Load and split dataset ────────────────────────────
             dataset = CheckersDataset(req.dataset_file)

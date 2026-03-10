@@ -36,7 +36,7 @@ export const Metrics = () => {
             const msg = JSON.parse(event.data);
             if (msg.type === 'metric') {
                 setStatus('Training...');
-                // Reset chart data when a new training run starts (epoch 0)
+                // Append or reset (if somehow we missed the 'training_started' event)
                 if (msg.epoch === 0) {
                     setData([{
                         epoch: msg.epoch,
@@ -50,6 +50,9 @@ export const Metrics = () => {
                         val_loss: msg.val_loss ?? undefined
                     }]);
                 }
+            } else if (msg.type === 'training_started') {
+                setStatus(msg.message);
+                setData([]); // Immediately clear the chart
             } else if (msg.type === 'status') {
                 setStatus(msg.message);
             }
