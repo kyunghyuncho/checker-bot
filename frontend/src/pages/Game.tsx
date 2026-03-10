@@ -28,6 +28,8 @@ import { ConfigPanel } from '../components/ConfigPanel';
 import { BrainVisualizer } from '../components/BrainVisualizer';
 import { Metrics } from '../components/Metrics';
 import { ModelRegistry } from '../components/ModelRegistry';
+import { GameMonitor } from '../components/GameMonitor';
+import type { MaterialSnapshot } from '../components/GameMonitor';
 
 // The main Dashboard view for playing and training
 export const Game = () => {
@@ -60,6 +62,23 @@ export const Game = () => {
     const [epsilon, setEpsilon] = useState(0.0);
     const [searchDepth, setSearchDepth] = useState(1);
     const [isPlaying, setIsPlaying] = useState(false);
+    const [moveHistory, setMoveHistory] = useState<MaterialSnapshot[]>([]);
+
+    // Track material after every board state change
+    useEffect(() => {
+        let redScore = 0, whiteScore = 0;
+        for (let r = 0; r < 8; r++) {
+            for (let c = 0; c < 8; c++) {
+                const p = boardState[r][c];
+                if (p === 1) redScore += 1.0;
+                else if (p === 3) redScore += 1.5;
+                else if (p === 2) whiteScore += 1.0;
+                else if (p === 4) whiteScore += 1.5;
+            }
+        }
+        setMoveHistory(prev => [...prev, { redScore, whiteScore }]);
+    }, [boardState]);
+
 
     const handleReset = () => {
         setBoardState(getInitialGrid());
@@ -67,6 +86,7 @@ export const Game = () => {
         setDualProbabilities(null);
         setGameOver(null);
         setIsPlaying(false); // Stop play on reset
+        setMoveHistory([]);  // Clear history on reset
     };
 
     const handleModelAssign = (side: 'black' | 'white', modelId: string | null) => {
@@ -168,6 +188,8 @@ export const Game = () => {
                     <div className={`status-indicator ${currentTurn === 1 ? 'active' : ''}`} style={{ backgroundColor: 'var(--piece-red)' }} /> Red {currentTurn === 1 ? "(Active)" : ""}
                     <div className={`status-indicator ${currentTurn === 2 ? 'active' : ''}`} style={{ backgroundColor: 'var(--piece-white)' }} /> White {currentTurn === 2 ? "(Active)" : ""}
                 </div>
+
+                <GameMonitor grid={boardState} currentTurn={currentTurn} moveHistory={moveHistory} />
             </div>
 
             {/* Right Column: AI Brain Visualization & Rules */}
