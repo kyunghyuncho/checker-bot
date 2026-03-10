@@ -24,6 +24,7 @@ interface ProgressUpdate {
     white: string;
     result: string;
     moves: number;
+    standings: RankingEntry[];
 }
 
 interface H2HEntry {
@@ -42,6 +43,7 @@ export const Tournament = () => {
     const [progress, setProgress] = useState<ProgressUpdate | null>(null);
     const [rankings, setRankings] = useState<RankingEntry[]>([]);
     const [h2h, setH2h] = useState<Record<string, H2HEntry>>({});
+    const [liveStandings, setLiveStandings] = useState<RankingEntry[]>([]);
     const [log, setLog] = useState<string[]>([]);
     const [error, setError] = useState('');
     const logRef = useRef<HTMLDivElement>(null);
@@ -53,6 +55,7 @@ export const Tournament = () => {
             const data = JSON.parse(event.data);
             if (data.type === 'tournament_progress') {
                 setProgress(data);
+                if (data.standings) setLiveStandings(data.standings);
                 setLog(prev => [...prev, `Game ${data.game}/${data.total}: ${data.red} (Red) vs ${data.white} (White) → ${data.result} (${data.moves} moves)`]);
             } else if (data.type === 'tournament_complete') {
                 setRankings(data.rankings);
@@ -73,6 +76,7 @@ export const Tournament = () => {
         setRunning(true);
         setRankings([]);
         setH2h({});
+        setLiveStandings([]);
         setLog([]);
         setProgress(null);
         setError('');
@@ -161,7 +165,49 @@ export const Tournament = () => {
 
             {/* Right: Results */}
             <div>
-                {/* Rankings table */}
+                {/* Live standings during tournament */}
+                {running && liveStandings.length > 0 && (
+                    <div className="panel" style={{ marginBottom: '1.5rem' }}>
+                        <h2 style={{ fontSize: '1rem', marginBottom: '0.75rem' }}>Live Standings</h2>
+                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+                            <thead>
+                                <tr style={{ borderBottom: '1px solid var(--border-color)', color: 'var(--text-muted)', textTransform: 'uppercase', fontSize: '0.7rem', letterSpacing: '0.05em' }}>
+                                    <th style={{ textAlign: 'left', padding: '0.5rem' }}>#</th>
+                                    <th style={{ textAlign: 'left', padding: '0.5rem' }}>Model</th>
+                                    <th style={{ textAlign: 'center', padding: '0.5rem' }}>W</th>
+                                    <th style={{ textAlign: 'center', padding: '0.5rem' }}>L</th>
+                                    <th style={{ textAlign: 'center', padding: '0.5rem' }}>D</th>
+                                    <th style={{ textAlign: 'center', padding: '0.5rem' }}>Games</th>
+                                    <th style={{ textAlign: 'right', padding: '0.5rem' }}>Win Rate</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {liveStandings.map((r, idx) => (
+                                    <tr key={r.model_id} style={{ borderBottom: '1px solid var(--glass-border)' }}>
+                                        <td style={{ padding: '0.5rem', fontWeight: 600, color: 'var(--text-muted)' }}>{idx + 1}</td>
+                                        <td style={{ padding: '0.5rem', fontWeight: 600 }}>{r.name}</td>
+                                        <td style={{ padding: '0.5rem', textAlign: 'center', color: 'var(--accent-green)' }}>{r.wins}</td>
+                                        <td style={{ padding: '0.5rem', textAlign: 'center', color: 'var(--accent-red)' }}>{r.losses}</td>
+                                        <td style={{ padding: '0.5rem', textAlign: 'center', color: 'var(--text-muted)' }}>{r.draws}</td>
+                                        <td style={{ padding: '0.5rem', textAlign: 'center' }}>{r.total}</td>
+                                        <td style={{ padding: '0.5rem', textAlign: 'right' }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '0.5rem' }}>
+                                                <div style={{ width: '50px', height: '4px', borderRadius: '2px', backgroundColor: 'var(--bg-primary)', overflow: 'hidden' }}>
+                                                    <div style={{ width: `${r.win_rate * 100}%`, height: '100%', borderRadius: '2px', backgroundColor: r.win_rate >= 0.5 ? 'var(--accent-green)' : 'var(--accent-red)', transition: 'width 0.3s' }} />
+                                                </div>
+                                                <span style={{ fontWeight: 700, fontSize: '0.8rem', color: r.win_rate >= 0.6 ? 'var(--accent-green)' : r.win_rate <= 0.4 ? 'var(--accent-red)' : 'var(--text-primary)', minWidth: '40px', textAlign: 'right' }}>
+                                                    {(r.win_rate * 100).toFixed(1)}%
+                                                </span>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                )}
+
+                {/* Final Rankings table */}
                 {rankings.length > 0 && (
                     <div className="panel" style={{ marginBottom: '1.5rem' }}>
                         <h2 style={{ fontSize: '1rem', marginBottom: '0.75rem' }}><Trophy size={18} /> Rankings</h2>

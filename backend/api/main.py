@@ -661,8 +661,26 @@ async def api_tournament(req: TournamentRequest, background_tasks: BackgroundTas
                 model_totals[red_id]["draws"] += 1
                 model_totals[white_id]["draws"] += 1
 
-            # Stream progress
+            # Stream progress with cumulative standings
             result_label = "Red" if winner == 1 else "White" if winner == 2 else "Draw"
+
+            # Build live standings snapshot
+            standings = []
+            for mid in model_ids:
+                t = model_totals[mid]
+                total_played = t["wins"] + t["losses"] + t["draws"]
+                wr = t["wins"] / total_played if total_played > 0 else 0.0
+                standings.append({
+                    "model_id": mid,
+                    "name": model_names[mid],
+                    "wins": t["wins"],
+                    "losses": t["losses"],
+                    "draws": t["draws"],
+                    "total": total_played,
+                    "win_rate": round(wr, 3)
+                })
+            standings.sort(key=lambda s: s["win_rate"], reverse=True)
+
             for ws in active_websockets:
                 asyncio.run_coroutine_threadsafe(
                     ws.send_text(json.dumps({
@@ -672,7 +690,8 @@ async def api_tournament(req: TournamentRequest, background_tasks: BackgroundTas
                         "red": model_names[red_id],
                         "white": model_names[white_id],
                         "result": result_label,
-                        "moves": move_count
+                        "moves": move_count,
+                        "standings": standings
                     })),
                     main_loop
                 )
