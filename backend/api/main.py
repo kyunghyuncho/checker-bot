@@ -75,6 +75,19 @@ def _get_model_list():
     and final loss values.
     """
     models = []
+    # Add the synthetic baseline heuristic agent first
+    models.append({
+        "id": "heuristic_agent",
+        "name": "Basic Heuristic (Pieces & Kings)",
+        "created_at": "",
+        "epochs_trained": 0,
+        "hidden_dims": 0,
+        "num_conv_layers": 0,
+        "dropout_rate": 0,
+        "learning_rate": 0,
+        "batch_size": 0
+    })
+
     for f in sorted(os.listdir(MODELS_DIR)):
         if f.endswith(".meta.json"):
             with open(os.path.join(MODELS_DIR, f), "r") as fh:

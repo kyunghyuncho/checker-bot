@@ -175,17 +175,21 @@ export const ModelRegistry: React.FC<ModelRegistryProps> = ({ blackModelId, whit
                                 />
 
                                 {/* Delete */}
-                                <button
-                                    onClick={() => handleDelete(m.id)}
-                                    style={{
-                                        background: 'none', border: 'none', padding: '0.25rem',
-                                        color: 'var(--text-muted)', cursor: 'pointer', flexShrink: 0,
-                                        borderRadius: '0.25rem', display: 'flex'
-                                    }}
-                                    title="Delete model"
-                                >
-                                    <Trash2 size={14} />
-                                </button>
+                                {m.id !== 'heuristic_agent' ? (
+                                    <button
+                                        onClick={() => handleDelete(m.id)}
+                                        style={{
+                                            background: 'none', border: 'none', padding: '0.25rem',
+                                            color: 'var(--text-muted)', cursor: 'pointer', flexShrink: 0,
+                                            borderRadius: '0.25rem', display: 'flex'
+                                        }}
+                                        title="Delete model"
+                                    >
+                                        <Trash2 size={14} />
+                                    </button>
+                                ) : (
+                                    <div style={{ width: '22px' }} />
+                                )}
                             </div>
                         );
                     })}
