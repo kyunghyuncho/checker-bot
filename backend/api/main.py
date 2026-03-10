@@ -111,7 +111,6 @@ class GenerateRequest(BaseModel):
     num_games: int = 10                          # Number of games to simulate
     depth: int = 4                               # Minimax search depth
     epsilon: float = 0.1                         # Probability of random moves
-    discount_factor: float = 0.0                 # Label discounting: 0=none, 1=max
     output_file: str = "backend/data/dataset.json"  # Output JSON path
 
 
@@ -126,6 +125,7 @@ class TrainRequest(BaseModel):
     batch_size: int = 32                          # Training batch size
     val_split: float = 0.2                        # Fraction of data for validation
     patience: int = 5                             # Early stopping patience (0 = disabled)
+    discount_factor: float = 0.0                  # Label discounting γ: 0=none, 1=max
 
 
 class InferRequest(BaseModel):
@@ -235,7 +235,7 @@ async def api_generate(req: GenerateRequest, background_tasks: BackgroundTasks):
                 )
 
         try:
-            generate_dataset(req.num_games, req.output_file, req.depth, req.epsilon, progress, discount_factor=req.discount_factor)
+            generate_dataset(req.num_games, req.output_file, req.depth, req.epsilon, progress)
             print("Dataset generation complete.")
             # Notify frontend of completion
             for ws in active_websockets:
@@ -284,7 +284,7 @@ async def api_train(req: TrainRequest, background_tasks: BackgroundTasks):
 
         try:
             # ── 1. Load and split dataset ────────────────────────────
-            dataset = CheckersDataset(req.dataset_file)
+            dataset = CheckersDataset(req.dataset_file, discount_factor=req.discount_factor)
             from torch.utils.data import DataLoader, random_split
 
             total = len(dataset)

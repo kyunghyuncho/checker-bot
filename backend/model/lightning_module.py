@@ -35,33 +35,45 @@ class CheckersDataset(Dataset):
     Reads from a JSON file produced by generator.py. Each game contains a
     history of board states, all labeled with the game's final outcome.
 
+    Exponential label discounting (γ) is applied at load time:
+        discounted_label = 0.5 + (raw_label − 0.5) × (1 − γ)^d
+    where d = distance from the final position in that game.
+    γ=0: no discounting (original behavior)
+    γ=1: only the last position gets the true label
+
     Each sample is a (tensor, target) pair:
         - tensor: shape (5, 8, 8) — board encoding for TwoHeadedCNN
         - target: shape (2,) — [P(black_wins), P(white_wins)]
     """
 
-    def __init__(self, json_file: str):
+    def __init__(self, json_file: str, discount_factor: float = 0.0):
         """Load all board states from the dataset JSON file into memory."""
         with open(json_file, 'r') as f:
             data = json.load(f)
 
         self.samples = []
         for game in data:
-            # Extract the outcome label (shared across all states in this game)
-            # label: 1.0 = Black win, 0.0 = White win, 0.5 = Draw
-            label = game.get('history', [{}])[0].get('label', 0.5) if game.get('history') else 0.5
+            history = game.get('history', [])
+            if not history:
+                continue
 
-            for state in game.get('history', []):
+            # Raw outcome label (same for all states in this game)
+            raw_label = history[0].get('label', 0.5)
+            T = len(history)
+
+            for t, state in enumerate(history):
                 # Convert the raw board grid to a 5-channel tensor
                 tensor = board_to_tensor(state['board'], state['turn'])
 
+                # Apply exponential discounting toward 0.5
+                d = T - 1 - t  # distance from end
+                discount = (1.0 - discount_factor) ** d
+                label = 0.5 + (raw_label - 0.5) * discount
+
                 # Derive targets for both heads
-                # Black win (label=1.0): target = [1.0, 0.0]
-                # White win (label=0.0): target = [0.0, 1.0]
-                # Draw     (label=0.5): target = [0.5, 0.5]
                 target_black = float(label)
                 target_white = 1.0 - float(label)
-                if target_black == 0.5:
+                if abs(target_black - 0.5) < 1e-6:
                     target_white = 0.5  # Draw: both heads predict 0.5
 
                 target = torch.tensor([target_black, target_white], dtype=torch.float32)

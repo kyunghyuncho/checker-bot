@@ -63,7 +63,7 @@ export const ConfigPanel = () => {
             const res = await fetch('http://localhost:8000/api/generate', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ num_games: numGames, depth, epsilon, discount_factor: discountFactor })
+                body: JSON.stringify({ num_games: numGames, depth, epsilon })
             });
             if (!res.ok) {
                 const errData = await res.json();
@@ -91,7 +91,8 @@ export const ConfigPanel = () => {
                     dropout_rate: dropoutRate,
                     batch_size: batchSize,
                     val_split: valSplit,
-                    patience
+                    patience,
+                    discount_factor: discountFactor
                 })
             });
 
@@ -169,10 +170,6 @@ export const ConfigPanel = () => {
                         <label>Epsilon (Randomness) <span>{epsilon}</span></label>
                         <input type="range" min="0" max="0.5" step="0.05" value={epsilon} onChange={(e) => setEpsilon(Number(e.target.value))} />
                     </div>
-                    <div className="input-group">
-                        <label>Label Discount γ <span>{discountFactor.toFixed(2)}</span></label>
-                        <input type="range" min="0" max="1" step="0.05" value={discountFactor} onChange={(e) => setDiscountFactor(Number(e.target.value))} />
-                    </div>
                     <button className="primary" onClick={handleGenerate} style={{ width: '100%', marginTop: '0.5rem', display: 'flex', justifyContent: 'center', gap: '0.5rem' }}>
                         <Database size={18} /> Generate Data
                     </button>
@@ -215,6 +212,10 @@ export const ConfigPanel = () => {
                     <div className="input-group">
                         <label>Batch Size <span>{batchSize}</span></label>
                         <input type="range" min="8" max="128" step="8" value={batchSize} onChange={(e) => setBatchSize(Number(e.target.value))} />
+                    </div>
+                    <div className="input-group">
+                        <label>Label Discount γ <span>{discountFactor.toFixed(2)}</span></label>
+                        <input type="range" min="0" max="1" step="0.05" value={discountFactor} onChange={(e) => setDiscountFactor(Number(e.target.value))} />
                     </div>
 
                     <h4 style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.5rem', marginTop: '1rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Early Stopping</h4>
