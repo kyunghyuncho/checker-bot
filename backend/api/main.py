@@ -87,6 +87,19 @@ def _get_model_list():
         "learning_rate": 0,
         "batch_size": 0
     })
+    
+    # Add the pure random baseline
+    models.append({
+        "id": "random_agent",
+        "name": "Random Agent (Uniform)",
+        "created_at": "",
+        "epochs_trained": 0,
+        "hidden_dims": 0,
+        "num_conv_layers": 0,
+        "dropout_rate": 0,
+        "learning_rate": 0,
+        "batch_size": 0
+    })
 
     for f in sorted(os.listdir(MODELS_DIR)):
         if f.endswith(".meta.json"):
@@ -507,11 +520,16 @@ async def api_infer(req: InferRequest):
 
     # Step 2: Load model if provided for heuristic evaluation during minimax
     model = None
-    if req.model_id:
+    if req.model_id and req.model_id not in ("heuristic_agent", "random_agent"):
         model = _load_model_by_id(req.model_id)
 
-    # Step 3: Select the best move via minimax (softmax sampling)
-    best_move = get_best_move(board, depth=req.depth, temperature=req.temperature, model=model)
+    # Step 3: Select the best move
+    if req.model_id == "random_agent":
+        import random
+        valid_moves = board.get_valid_moves(board.current_turn)
+        best_move = random.choice(valid_moves) if valid_moves else None
+    else:
+        best_move = get_best_move(board, depth=req.depth, temperature=req.temperature, model=model)
 
     # Step 4: Apply the move and check for game over
     move_payload = None
@@ -676,8 +694,14 @@ async def api_tournament(req: TournamentRequest, background_tasks: BackgroundTas
                     break
 
                 # Pick the right model for the current player
-                current_model = red_model if board.current_turn == 1 else white_model
-                move = get_best_move(board, req.depth, req.temperature, model=current_model)
+                current_id = red_id if board.current_turn == 1 else white_id
+                
+                if current_id == "random_agent":
+                    valid_moves = board.get_valid_moves(board.current_turn)
+                    move = rng.choice(valid_moves) if valid_moves else None
+                else:
+                    current_model = red_model if board.current_turn == 1 else white_model
+                    move = get_best_move(board, req.depth, req.temperature, model=current_model)
 
                 if move:
                     board.make_move(move)

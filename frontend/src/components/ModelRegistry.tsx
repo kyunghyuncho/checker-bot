@@ -175,7 +175,7 @@ export const ModelRegistry: React.FC<ModelRegistryProps> = ({ blackModelId, whit
                                 />
 
                                 {/* Delete */}
-                                {m.id !== 'heuristic_agent' ? (
+                                {m.id !== 'heuristic_agent' && m.id !== 'random_agent' ? (
                                     <button
                                         onClick={() => handleDelete(m.id)}
                                         style={{

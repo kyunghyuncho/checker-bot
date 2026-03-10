@@ -36,6 +36,20 @@ export const ModelTooltip: React.FC<ModelTooltipProps> = ({ name, meta }) => {
         );
     }
 
+    if (meta.id === 'random_agent') {
+        return (
+            <span style={{ position: 'relative', cursor: 'help', borderBottom: '1px dotted var(--text-muted)' }} className="model-tooltip">
+                {name}
+                <span className="model-tooltip-content" style={{ whiteSpace: 'normal', width: '220px' }}>
+                    <strong>{name}</strong>
+                    <div style={{ marginTop: '0.5rem', color: 'var(--text-muted)' }}>
+                        Picks a completely random valid move. Serves as the absolute worst-case baseline.
+                    </div>
+                </span>
+            </span>
+        );
+    }
+
     return (
         <span style={{ position: 'relative', cursor: 'help', borderBottom: '1px dotted var(--text-muted)' }} className="model-tooltip">
             {name}
