@@ -54,6 +54,7 @@ app.add_middleware(
 
 active_websockets: list = []     # Connected WebSocket clients for metric streaming
 is_training: bool = False        # Lock: only one training job can run at a time
+stop_training: bool = False      # Flag to signal training to stop gracefully
 model_cache: dict = {}           # In-memory cache: model_id → CheckersLightningModule
 
 # Directory where .ckpt and .meta.json files are persisted
@@ -262,15 +263,16 @@ async def api_train(req: TrainRequest, background_tasks: BackgroundTasks):
     Streams epoch-level loss metrics to WebSocket clients during training.
     On completion, saves the model checkpoint + metadata and notifies the frontend.
     """
-    global is_training
+    global is_training, stop_training
     if is_training:
         raise HTTPException(status_code=400, detail="Training is already in progress.")
 
     main_loop = asyncio.get_running_loop()
 
     def _run_train():
-        global is_training
+        global is_training, stop_training
         is_training = True
+        stop_training = False
         
         # Notify the frontend immediately so it can reset the metrics chart
         for ws in active_websockets:
@@ -301,7 +303,14 @@ async def api_train(req: TrainRequest, background_tasks: BackgroundTasks):
             )
 
             # ── 3. Configure trainer ─────────────────────────────────
-            callbacks = [WebSocketMetricsCallback(main_loop)]
+            class CancelTrainingCallback(Callback):
+                def on_train_batch_end(self, trainer, pl_module, outputs, batch, batch_idx):
+                    global stop_training
+                    if stop_training:
+                        print("Stop training requested! Halting epoch...")
+                        trainer.should_stop = True
+
+            callbacks = [WebSocketMetricsCallback(main_loop), CancelTrainingCallback()]
             if req.patience > 0:
                 callbacks.append(EarlyStopping(
                     monitor='val_loss',
@@ -378,6 +387,19 @@ async def api_train(req: TrainRequest, background_tasks: BackgroundTasks):
 
     background_tasks.add_task(_run_train)
     return {"message": "Training started."}
+
+
+@app.post("/api/train/stop")
+async def api_train_stop():
+    """
+    Requested by the frontend to gracefully stop an ongoing training run.
+    """
+    global stop_training, is_training
+    if not is_training:
+        return {"message": "No training is currently running."}
+    
+    stop_training = True
+    return {"message": "Stop signal sent to trainer."}
 
 
 # ── Dataset Inspection ───────────────────────────────────────────────

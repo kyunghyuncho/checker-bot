@@ -16,7 +16,7 @@
  * A status bar shows real-time progress received via WebSocket.
  */
 import { useState, useEffect } from 'react';
-import { Settings, Play, Database, ChevronDown, ChevronRight } from 'lucide-react';
+import { Settings, Play, Database, ChevronDown, ChevronRight, Square } from 'lucide-react';
 
 export const ConfigPanel = () => {
     const [numGames, setNumGames] = useState(10);
@@ -34,14 +34,20 @@ export const ConfigPanel = () => {
     const [errorMsg, setErrorMsg] = useState<string>('');
     const [genOpen, setGenOpen] = useState(false);
     const [trainOpen, setTrainOpen] = useState(false);
+    const [isTraining, setIsTraining] = useState(false);
 
     useEffect(() => {
         const ws = new WebSocket('ws://localhost:8000/ws/metrics');
         ws.onmessage = (event) => {
             const msg = JSON.parse(event.data);
-            if (msg.type === 'status') {
+            if (msg.type === 'training_started') {
+                setIsTraining(true);
+                setStatusText(msg.message);
+                setErrorMsg('');
+            } else if (msg.type === 'status') {
                 setStatusText(msg.message);
                 if (msg.message === "Data Generation Complete!" || msg.message === "Training Complete!") {
+                    if (msg.message === "Training Complete!") setIsTraining(false);
                     setTimeout(() => setStatusText(''), 3000);
                 }
             } else if (msg.type === 'metric') {
@@ -101,6 +107,26 @@ export const ConfigPanel = () => {
         }
     };
 
+    const handleStopTraining = async () => {
+        try {
+            const response = await fetch('http://localhost:8000/api/train/stop', {
+                method: 'POST'
+            });
+            if (!response.ok) {
+                const errData = await response.json();
+                throw new Error(errData.detail || 'Failed to stop training');
+            }
+            setStatusText('Sent stop signal...');
+            setErrorMsg('');
+            // We do NOT set isTraining(false) yet. 
+            // We wait for the "Training Complete!" status from the websocket 
+            // to confirm PyTorch Lightning actually terminated the loop and saved the model.
+        } catch (e: any) {
+            console.error(e);
+            setErrorMsg(`Error stopping: ${e.message || e}`);
+        }
+    };
+
     return (
         <div className="panel">
             <h2><Settings size={20} /> Configuration</h2>
@@ -132,7 +158,7 @@ export const ConfigPanel = () => {
                 {genOpen && (<>
                     <div className="input-group">
                         <label>Games to Generate <span>{numGames}</span></label>
-                        <input type="range" min="1" max="50" value={numGames} onChange={(e) => setNumGames(Number(e.target.value))} />
+                        <input type="range" min="1" max="500" value={numGames} onChange={(e) => setNumGames(Number(e.target.value))} />
                     </div>
                     <div className="input-group">
                         <label>Search Depth <span>{depth}</span></label>
@@ -196,9 +222,15 @@ export const ConfigPanel = () => {
                         <input type="range" min="0" max="20" value={patience} onChange={(e) => setPatience(Number(e.target.value))} />
                     </div>
 
-                    <button className="primary" onClick={handleTrain} style={{ width: '100%', marginTop: '0.5rem', display: 'flex', justifyContent: 'center', gap: '0.5rem', background: 'linear-gradient(135deg, var(--accent-green), #059669)' }}>
-                        <Play size={18} /> Start Training
-                    </button>
+                    {!isTraining ? (
+                        <button className="primary" onClick={handleTrain} style={{ width: '100%', marginTop: '0.5rem', display: 'flex', justifyContent: 'center', gap: '0.5rem', background: 'linear-gradient(135deg, var(--accent-green), #059669)' }}>
+                            <Play size={18} /> Start Training
+                        </button>
+                    ) : (
+                        <button className="primary" onClick={handleStopTraining} style={{ width: '100%', marginTop: '0.5rem', display: 'flex', justifyContent: 'center', gap: '0.5rem', background: 'linear-gradient(135deg, var(--accent-red), #b91c1c)' }}>
+                            <Square size={18} /> Stop Training
+                        </button>
+                    )}
                 </>)}
             </div>
         </div>
