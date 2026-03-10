@@ -128,11 +128,19 @@ class TrainRequest(BaseModel):
 
 class InferRequest(BaseModel):
     """Parameters for AI move inference."""
-    board_state: list[list[int]]         # 8×8 grid of piece constants
-    current_turn: int                    # 1 (BLACK) or 2 (WHITE)
-    depth: int = 1                       # Minimax search depth for move selection
-    model_id: str | None = None          # Optional: specific model for CNN evaluation
-    epsilon: float = 0.0                 # Move randomness (0 = fully deterministic)
+    board_state: list[list[int]]                  # Complete 8x8 grid of integers
+    current_turn: int                             # 1 (Black/Red) or 2 (White)
+    depth: int = 4                                # Minimax search depth
+    model_id: str | None = None                   # ID of the model playing this turn
+    epsilon: float = 0.0                          # Randomness factor (0.0 = completely optimal)
+
+
+class EvaluateRequest(BaseModel):
+    """Parameters for dual-model board evaluation."""
+    board_state: list[list[int]]                  # Complete 8x8 grid of integers
+    current_turn: int                             # 1 (Black/Red) or 2 (White)
+    red_model_id: str | None = None               # ID of the model assigned to Red
+    white_model_id: str | None = None             # ID of the model assigned to White
 
 
 class MoveValidationRequest(BaseModel):
@@ -459,24 +467,10 @@ async def api_infer(req: InferRequest):
             "game_over": game_over
         }
 
-    # Step 2: CNN evaluation (optional, for visualization)
-    cnn_probs = None
+    # Step 2: Load model if provided for heuristic evaluation during minimax
     model = None
     if req.model_id:
         model = _load_model_by_id(req.model_id)
-
-    if model is not None:
-        # Convert board to tensor and run through the CNN
-        tensor = board_to_tensor(req.board_state, req.current_turn)
-        tensor = tensor.unsqueeze(0)  # Add batch dimension: (1, 5, 8, 8)
-
-        model.eval()
-        with torch.no_grad():
-            p_black, p_white = model(tensor)
-            cnn_probs = {
-                "p_black": round(p_black.item(), 4),
-                "p_white": round(p_white.item(), 4)
-            }
 
     # Step 3: Select the best move via minimax (epsilon-greedy)
     best_move = get_best_move(board, depth=req.depth, epsilon=req.epsilon, model=model)
@@ -499,10 +493,48 @@ async def api_infer(req: InferRequest):
 
     return {
         "move": move_payload,
-        "cnn_probabilities": cnn_probs,
         "game_over": game_over
     }
 
+
+@app.post("/api/evaluate")
+async def api_evaluate(req: EvaluateRequest):
+    """
+    Evaluates the board state against the provided models and returns 
+    their respective win probabilities. Used by the frontend AI Brain Visualizer
+    to show both sides' thoughts simultaneously.
+    """
+    result = {"red_eval": None, "white_eval": None}
+    
+    # Evaluate RED model
+    if req.red_model_id:
+        red_model = _load_model_by_id(req.red_model_id)
+        if red_model is not None:
+            tensor = board_to_tensor(req.board_state, req.current_turn)
+            tensor = tensor.unsqueeze(0)
+            red_model.eval()
+            with torch.no_grad():
+                p_black, p_white = red_model(tensor)
+                result["red_eval"] = {
+                    "p_black": round(p_black.item(), 4),
+                    "p_white": round(p_white.item(), 4)
+                }
+                
+    # Evaluate WHITE model
+    if req.white_model_id:
+        white_model = _load_model_by_id(req.white_model_id)
+        if white_model is not None:
+            tensor = board_to_tensor(req.board_state, req.current_turn)
+            tensor = tensor.unsqueeze(0)
+            white_model.eval()
+            with torch.no_grad():
+                p_black, p_white = white_model(tensor)
+                result["white_eval"] = {
+                    "p_black": round(p_black.item(), 4),
+                    "p_white": round(p_white.item(), 4)
+                }
+
+    return result
 
 # ── WebSocket ────────────────────────────────────────────────────────
 

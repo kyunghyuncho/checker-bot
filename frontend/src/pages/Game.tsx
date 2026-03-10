@@ -21,7 +21,7 @@
  *   - cnnProbabilities: latest CNN output for the brain visualizer
  *   - gameOver: winner ID when the game ends (null while active)
  */
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Info, RotateCcw, Play, Pause } from 'lucide-react';
 import { Board } from '../components/Board';
 import { ConfigPanel } from '../components/ConfigPanel';
@@ -52,16 +52,19 @@ export const Game = () => {
     const [currentTurn, setCurrentTurn] = useState<number>(2); // White (2) moves first
     const [blackModelId, setBlackModelId] = useState<string | null>(null);
     const [whiteModelId, setWhiteModelId] = useState<string | null>(null);
-    const [cnnProbabilities, setCnnProbabilities] = useState<{ p_black: number, p_white: number } | null>(null);
+    const [dualProbabilities, setDualProbabilities] = useState<{
+        red_eval: { p_black: number, p_white: number } | null;
+        white_eval: { p_black: number, p_white: number } | null;
+    } | null>(null);
     const [gameOver, setGameOver] = useState<number | null>(null);
     const [epsilon, setEpsilon] = useState(0.0);
-    const [searchDepth, setSearchDepth] = useState(4);
+    const [searchDepth, setSearchDepth] = useState(1);
     const [isPlaying, setIsPlaying] = useState(false);
 
     const handleReset = () => {
         setBoardState(getInitialGrid());
         setCurrentTurn(2);
-        setCnnProbabilities(null);
+        setDualProbabilities(null);
         setGameOver(null);
         setIsPlaying(false); // Stop play on reset
     };
@@ -70,6 +73,35 @@ export const Game = () => {
         if (side === 'black') setBlackModelId(modelId);
         else setWhiteModelId(modelId);
     };
+
+    // Poll dual probabilities on every UI update or state change
+    useEffect(() => {
+        if (!blackModelId && !whiteModelId) {
+            setDualProbabilities(null);
+            return;
+        }
+
+        const fetchProbabilities = async () => {
+            try {
+                const response = await fetch('http://localhost:8000/api/evaluate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        board_state: boardState,
+                        current_turn: currentTurn,
+                        red_model_id: blackModelId,
+                        white_model_id: whiteModelId
+                    })
+                });
+                const data = await response.json();
+                setDualProbabilities(data);
+            } catch (err) {
+                console.error("Evaluate Error:", err);
+            }
+        };
+
+        fetchProbabilities();
+    }, [boardState, currentTurn, blackModelId, whiteModelId]);
 
     // Determine play mode for display
     const blackIsAI = blackModelId !== null;
@@ -128,7 +160,6 @@ export const Game = () => {
                     isPlaying={isPlaying}
                     setGrid={setBoardState}
                     setCurrentTurn={setCurrentTurn}
-                    setCnnProbabilities={setCnnProbabilities}
                     gameOver={gameOver}
                     setGameOver={setGameOver}
                 />
@@ -141,7 +172,7 @@ export const Game = () => {
 
             {/* Right Column: AI Brain Visualization & Rules */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-                <BrainVisualizer probabilities={cnnProbabilities} />
+                <BrainVisualizer dualProbabilities={dualProbabilities} redAssigned={blackModelId !== null} whiteAssigned={whiteModelId !== null} />
 
                 <div className="panel">
                     <h2><Info size={20} /> How to Play</h2>
