@@ -55,6 +55,7 @@ app.add_middleware(
 active_websockets: list = []     # Connected WebSocket clients for metric streaming
 is_training: bool = False        # Lock: only one training job can run at a time
 stop_training: bool = False      # Flag to signal training to stop gracefully
+stop_tournament: bool = False    # Flag to signal tournament to stop
 model_cache: dict = {}           # In-memory cache: model_id → CheckersLightningModule
 
 # Directory where .ckpt and .meta.json files are persisted
@@ -609,11 +610,18 @@ async def api_tournament(req: TournamentRequest, background_tasks: BackgroundTas
         from backend.engine.board import CheckersBoard
         from backend.engine.minimax import get_best_move
 
+        global stop_tournament
+        stop_tournament = False
+
         # Initialize per-pair stats: {(red_id, white_id): {wins, losses, draws}}
         pair_stats: dict = {}
         model_totals: dict = {mid: {"wins": 0, "losses": 0, "draws": 0} for mid in model_ids}
 
         for game_idx in range(req.num_games):
+            # Check stop signal
+            if stop_tournament:
+                break
+
             # Pick two distinct random models
             red_id, white_id = rng.sample(model_ids, 2)
             red_model = _load_model_by_id(red_id)
@@ -726,6 +734,14 @@ async def api_tournament(req: TournamentRequest, background_tasks: BackgroundTas
 
     background_tasks.add_task(_run_tournament)
     return {"message": f"Tournament started: {req.num_games} games among {len(model_ids)} models."}
+
+
+@app.post("/api/tournament/stop")
+async def api_tournament_stop():
+    """Signal the running tournament to stop after the current game."""
+    global stop_tournament
+    stop_tournament = True
+    return {"message": "Tournament stop signal sent."}
 
 
 # ── Model Registry ───────────────────────────────────────────────────

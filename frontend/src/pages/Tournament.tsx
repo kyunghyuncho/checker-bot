@@ -5,7 +5,7 @@
  * Displays live progress, final rankings, and head-to-head results.
  */
 import { useState, useEffect, useRef } from 'react';
-import { Trophy, Play, Loader } from 'lucide-react';
+import { Trophy, Play } from 'lucide-react';
 
 interface RankingEntry {
     model_id: string;
@@ -98,6 +98,23 @@ export const Tournament = () => {
         }
     };
 
+    const handleStop = async () => {
+        try {
+            await fetch('http://localhost:8000/api/tournament/stop', { method: 'POST' });
+        } catch (e) {
+            console.error('Failed to stop tournament', e);
+        }
+    };
+
+    const handleReset = () => {
+        setRankings([]);
+        setH2h({});
+        setLiveStandings([]);
+        setLog([]);
+        setProgress(null);
+        setError('');
+    };
+
     // Build unique model list for H2H matrix
     const modelIds = [...new Set(rankings.map(r => r.model_id))];
     const modelNames: Record<string, string> = {};
@@ -132,14 +149,33 @@ export const Tournament = () => {
                     <input type="range" min="50" max="500" step="50" value={maxMoves} onChange={(e) => setMaxMoves(Number(e.target.value))} />
                 </div>
 
-                <button
-                    className="primary"
-                    onClick={handleStart}
-                    disabled={running}
-                    style={{ width: '100%', marginTop: '0.75rem', display: 'flex', justifyContent: 'center', gap: '0.5rem' }}
-                >
-                    {running ? <><Loader size={18} className="spin" /> Running...</> : <><Play size={18} /> Run Tournament</>}
-                </button>
+                <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.75rem' }}>
+                    {!running ? (
+                        <button
+                            className="primary"
+                            onClick={handleStart}
+                            style={{ flex: 1, display: 'flex', justifyContent: 'center', gap: '0.5rem' }}
+                        >
+                            <Play size={18} /> Run Tournament
+                        </button>
+                    ) : (
+                        <button
+                            className="primary"
+                            onClick={handleStop}
+                            style={{ flex: 1, display: 'flex', justifyContent: 'center', gap: '0.5rem', backgroundColor: 'var(--accent-red)' }}
+                        >
+                            ■ Stop
+                        </button>
+                    )}
+                    {(rankings.length > 0 || liveStandings.length > 0) && !running && (
+                        <button
+                            onClick={handleReset}
+                            style={{ padding: '0.5rem 1rem', borderRadius: '0.5rem', border: '1px solid var(--glass-border)', background: 'transparent', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: '0.85rem' }}
+                        >
+                            Reset
+                        </button>
+                    )}
+                </div>
 
                 {error && (
                     <div style={{ marginTop: '0.75rem', padding: '0.5rem', borderRadius: '0.5rem', backgroundColor: 'rgba(239,68,68,0.1)', border: '1px solid var(--accent-red)', color: 'var(--accent-red)', fontSize: '0.85rem', textAlign: 'center' }}>
