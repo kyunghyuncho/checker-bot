@@ -30,12 +30,12 @@ from backend.model.cnn import TwoHeadedCNN, board_to_tensor
 
 class CheckersDataset(Dataset):
     """
-    In-memory dataset of labeled checkers board states.
+    Lazy-loading dataset of labeled checkers board states.
 
-    Reads from a JSON file produced by generator.py. Each game contains a
-    history of board states, all labeled with the game's final outcome.
+    Reads from a JSON file produced by generator.py. Stores raw board data
+    and converts to tensors on-the-fly in __getitem__() for fast initialization.
 
-    Exponential label discounting (γ) is applied at load time:
+    Exponential label discounting (γ) is precomputed during init:
         discounted_label = 0.5 + (raw_label − 0.5) × (1 − γ)^d
     where d = distance from the final position in that game.
     γ=0: no discounting (original behavior)
@@ -47,43 +47,42 @@ class CheckersDataset(Dataset):
     """
 
     def __init__(self, json_file: str, discount_factor: float = 0.0):
-        """Load all board states from the dataset JSON file into memory."""
+        """Index all board states from the dataset JSON file (lazy: no tensor conversion yet)."""
         with open(json_file, 'r') as f:
             data = json.load(f)
 
-        self.samples = []
+        # Store lightweight references: (board_grid, turn, discounted_label)
+        self.entries: list[tuple[list, int, float]] = []
         for game in data:
             history = game.get('history', [])
             if not history:
                 continue
 
-            # Raw outcome label (same for all states in this game)
             raw_label = history[0].get('label', 0.5)
             T = len(history)
 
             for t, state in enumerate(history):
-                # Convert the raw board grid to a 5-channel tensor
-                tensor = board_to_tensor(state['board'], state['turn'])
-
-                # Apply exponential discounting toward 0.5
-                d = T - 1 - t  # distance from end
+                d = T - 1 - t
                 discount = (1.0 - discount_factor) ** d
                 label = 0.5 + (raw_label - 0.5) * discount
-
-                # Derive targets for both heads
-                target_black = float(label)
-                target_white = 1.0 - float(label)
-                if abs(target_black - 0.5) < 1e-6:
-                    target_white = 0.5  # Draw: both heads predict 0.5
-
-                target = torch.tensor([target_black, target_white], dtype=torch.float32)
-                self.samples.append((tensor, target))
+                self.entries.append((state['board'], state['turn'], label))
 
     def __len__(self):
-        return len(self.samples)
+        return len(self.entries)
 
     def __getitem__(self, idx):
-        return self.samples[idx]
+        board, turn, label = self.entries[idx]
+
+        # Convert to tensor on-the-fly (lazy)
+        tensor = board_to_tensor(board, turn)
+
+        target_black = float(label)
+        target_white = 1.0 - float(label)
+        if abs(target_black - 0.5) < 1e-6:
+            target_white = 0.5
+
+        target = torch.tensor([target_black, target_white], dtype=torch.float32)
+        return tensor, target
 
 
 class CheckersLightningModule(pl.LightningModule):
