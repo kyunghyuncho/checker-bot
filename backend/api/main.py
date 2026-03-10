@@ -479,7 +479,7 @@ async def api_infer(req: InferRequest):
             }
 
     # Step 3: Select the best move via minimax (epsilon-greedy)
-    best_move = get_best_move(board, depth=req.depth, epsilon=req.epsilon)
+    best_move = get_best_move(board, depth=req.depth, epsilon=req.epsilon, model=model)
 
     # Step 4: Apply the move and check for game over
     move_payload = None

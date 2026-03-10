@@ -24,7 +24,8 @@ def minimax(
     depth: int,
     alpha: float,
     beta: float,
-    maximizing_player: bool
+    maximizing_player: bool,
+    model: Optional['CheckersLightningModule'] = None
 ) -> Tuple[float, Optional[Tuple]]:
     """
     Minimax search with Alpha-Beta pruning.
@@ -35,6 +36,7 @@ def minimax(
         alpha:              Best score the maximizer can guarantee (starts at -∞)
         beta:               Best score the minimizer can guarantee (starts at +∞)
         maximizing_player:  True if it's Black's turn (maximizer)
+        model:              Optional trained CNN model to use for heuristic evaluation
 
     Returns:
         (score, move) — the best evaluation score and the move that produces it.
@@ -51,6 +53,22 @@ def minimax(
 
     # ── Depth limit reached: use heuristic evaluation ────────────────
     if depth == 0:
+        if model is not None:
+            # Import here to avoid circular dependencies
+            import torch
+            from backend.model.cnn import board_to_tensor
+            
+            tensor = board_to_tensor(position.grid, position.current_turn)
+            tensor = tensor.unsqueeze(0)  # Add batch dimension: (1, 5, 8, 8)
+            with torch.no_grad():
+                # The model outputs probabilities: (p_black_win, p_white_win)
+                # We need a scalar evaluation where positive = good for Black
+                p_black, p_white = model(tensor)
+                # Scale up to roughly match heuristic magnitudes [-20, +20]
+                eval_score = (p_black.item() - p_white.item()) * 20.0
+            return eval_score, None
+            
+        # Fallback to hardcoded piece-counting heuristic
         return position.evaluate(), None
 
     # ── Maximizing player (Black) ────────────────────────────────────
@@ -69,7 +87,7 @@ def minimax(
             child_state.make_move(move)
 
             # Recurse: next turn belongs to the minimizer (White)
-            eval_score, _ = minimax(child_state, depth - 1, alpha, beta, False)
+            eval_score, _ = minimax(child_state, depth - 1, alpha, beta, False, model)
 
             if eval_score > max_eval:
                 max_eval = eval_score
@@ -97,7 +115,7 @@ def minimax(
             child_state.make_move(move)
 
             # Recurse: next turn belongs to the maximizer (Black)
-            eval_score, _ = minimax(child_state, depth - 1, alpha, beta, True)
+            eval_score, _ = minimax(child_state, depth - 1, alpha, beta, True, model)
 
             if eval_score < min_eval:
                 min_eval = eval_score
@@ -112,7 +130,12 @@ def minimax(
         return min_eval, best_move
 
 
-def get_best_move(position: CheckersBoard, depth: int, epsilon: float = 0.0) -> Optional[Tuple]:
+def get_best_move(
+    position: CheckersBoard, 
+    depth: int, 
+    epsilon: float = 0.0,
+    model: Optional['CheckersLightningModule'] = None
+) -> Optional[Tuple]:
     """
     Entry point for AI decision-making. Selects the best move for the current player.
 
@@ -143,5 +166,5 @@ def get_best_move(position: CheckersBoard, depth: int, epsilon: float = 0.0) -> 
     # Optimal play: minimax with alpha-beta pruning
     # Black is maximizing (positive heuristic), White is minimizing (negative)
     is_maximizing = position.current_turn == BLACK
-    _, move = minimax(position, depth, float('-inf'), float('inf'), is_maximizing)
+    _, move = minimax(position, depth, float('-inf'), float('inf'), is_maximizing, model)
     return move
