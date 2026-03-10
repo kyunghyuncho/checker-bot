@@ -133,38 +133,70 @@ def minimax(
 def get_best_move(
     position: CheckersBoard, 
     depth: int, 
-    epsilon: float = 0.0,
+    temperature: float = 0.0,
     model: Optional['CheckersLightningModule'] = None
 ) -> Optional[Tuple]:
     """
-    Entry point for AI decision-making. Selects the best move for the current player.
+    Entry point for AI decision-making. Selects a move for the current player.
 
-    Uses an epsilon-greedy strategy:
-        - With probability ε, pick a uniformly random legal move
-        - Otherwise, use minimax search to pick the optimal move
+    Uses softmax (Boltzmann) sampling over minimax scores:
+        - Evaluate all legal moves via minimax search
+        - Convert scores to probabilities via softmax(scores / τ)
+        - Sample a move from this distribution
 
-    This randomness serves two purposes:
-        1. During data generation: produces diverse training games
-        2. During AI vs AI play: prevents identical games
+    Temperature τ controls exploration:
+        - τ = 0: greedy (always the best move)
+        - τ > 0: stochastic — good moves are favored, weak moves are rare
+        - τ → ∞: uniform random
 
     Args:
-        position:  Current board state
-        depth:     Search depth for minimax (higher = stronger but slower)
-        epsilon:   Probability of choosing a random move instead of optimal
+        position:    Current board state
+        depth:       Search depth for minimax (higher = stronger but slower)
+        temperature: Softmax temperature for move sampling (0 = greedy)
+        model:       Optional trained CNN for leaf evaluation
 
     Returns:
         A move tuple (start, end, captured), or None if no legal moves exist.
     """
+    import math
+
     valid_moves = position.get_valid_moves(position.current_turn)
     if not valid_moves:
         return None
 
-    # Epsilon-greedy: random exploration
-    if random.random() < epsilon:
-        return random.choice(valid_moves)
+    if len(valid_moves) == 1:
+        return valid_moves[0]
 
-    # Optimal play: minimax with alpha-beta pruning
-    # Black is maximizing (positive heuristic), White is minimizing (negative)
+    # Evaluate all moves via minimax
     is_maximizing = position.current_turn == BLACK
-    _, move = minimax(position, depth, float('-inf'), float('inf'), is_maximizing, model)
-    return move
+    scores = []
+    for move in valid_moves:
+        child = position.clone()
+        child.make_move(move)
+        score, _ = minimax(child, depth - 1, float('-inf'), float('inf'), not is_maximizing, model)
+        scores.append(score)
+
+    # If minimizing (White), negate scores so higher = better for current player
+    if not is_maximizing:
+        scores = [-s for s in scores]
+
+    # Greedy: pick the best move
+    if temperature <= 0:
+        best_idx = max(range(len(scores)), key=lambda i: scores[i])
+        return valid_moves[best_idx]
+
+    # Softmax sampling with temperature
+    # Clamp scores to avoid inf issues in exp()
+    CLAMP = 50.0
+    clamped = [max(-CLAMP, min(CLAMP, s)) for s in scores]
+    scaled = [s / temperature for s in clamped]
+
+    # Numerical stability: subtract max before exp
+    max_s = max(scaled)
+    exps = [math.exp(s - max_s) for s in scaled]
+    total = sum(exps)
+    probs = [e / total for e in exps]
+
+    # Weighted random selection
+    chosen = random.choices(valid_moves, weights=probs, k=1)[0]
+    return chosen

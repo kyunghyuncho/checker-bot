@@ -108,9 +108,9 @@ def _load_model_by_id(model_id: str):
 
 class GenerateRequest(BaseModel):
     """Parameters for self-play data generation."""
-    num_games: int = 10                          # Number of games to simulate
-    depth: int = 4                               # Minimax search depth
-    epsilon: float = 0.1                         # Probability of random moves
+    num_games: int = 50                          # Number of games to simulate
+    depth: int = 2                               # Minimax search depth
+    temperature: float = 1.0                     # Softmax temperature for move sampling
     output_file: str = "backend/data/dataset.json"  # Output JSON path
 
 
@@ -120,21 +120,21 @@ class TrainRequest(BaseModel):
     epochs: int = 20                              # Maximum training epochs
     learning_rate: float = 0.001                  # Adam optimizer learning rate
     hidden_dims: int = 64                         # CNN filter count / hidden dims
-    num_conv_layers: int = 2                      # Number of conv blocks
-    dropout_rate: float = 0.2                     # Dropout probability in FC heads
+    num_conv_layers: int = 3                      # Number of conv blocks
+    dropout_rate: float = 0.1                     # Dropout probability in FC heads
     batch_size: int = 32                          # Training batch size
-    val_split: float = 0.2                        # Fraction of data for validation
+    val_split: float = 0.1                        # Fraction of data for validation
     patience: int = 5                             # Early stopping patience (0 = disabled)
-    discount_factor: float = 0.0                  # Label discounting γ: 0=none, 1=max
+    discount_factor: float = 0.05                  # Label discounting γ: 0=none, 1=max
 
 
 class InferRequest(BaseModel):
     """Parameters for AI move inference."""
     board_state: list[list[int]]                  # Complete 8x8 grid of integers
     current_turn: int                             # 1 (Black/Red) or 2 (White)
-    depth: int = 4                                # Minimax search depth
+    depth: int = 1                                # Minimax search depth
     model_id: str | None = None                   # ID of the model playing this turn
-    epsilon: float = 0.0                          # Randomness factor (0.0 = completely optimal)
+    temperature: float = 0.0                      # Softmax temperature (0 = greedy)
 
 
 class EvaluateRequest(BaseModel):
@@ -235,7 +235,7 @@ async def api_generate(req: GenerateRequest, background_tasks: BackgroundTasks):
                 )
 
         try:
-            generate_dataset(req.num_games, req.output_file, req.depth, req.epsilon, progress)
+            generate_dataset(req.num_games, req.output_file, req.depth, req.temperature, progress)
             print("Dataset generation complete.")
             # Notify frontend of completion
             for ws in active_websockets:
@@ -495,8 +495,8 @@ async def api_infer(req: InferRequest):
     if req.model_id:
         model = _load_model_by_id(req.model_id)
 
-    # Step 3: Select the best move via minimax (epsilon-greedy)
-    best_move = get_best_move(board, depth=req.depth, epsilon=req.epsilon, model=model)
+    # Step 3: Select the best move via minimax (softmax sampling)
+    best_move = get_best_move(board, depth=req.depth, temperature=req.temperature, model=model)
 
     # Step 4: Apply the move and check for game over
     move_payload = None

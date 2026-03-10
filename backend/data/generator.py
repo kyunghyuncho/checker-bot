@@ -42,18 +42,17 @@ def serialize_board_state(board: CheckersBoard) -> List[List[int]]:
     return [row[:] for row in board.grid]
 
 
-def generate_synthetic_game(depth: int = 4, epsilon: float = 0.1, max_moves: int = 200) -> Dict:
+def generate_synthetic_game(depth: int = 4, temperature: float = 1.0, max_moves: int = 200) -> Dict:
     """
     Play a complete game of checkers via AI self-play and record the result.
 
-    The AI uses minimax with alpha-beta pruning. The epsilon parameter controls
-    the probability of choosing a random move instead of the optimal one,
-    which produces more diverse training data.
+    The AI uses minimax with alpha-beta pruning. The temperature parameter
+    controls softmax move sampling for diverse training data.
 
     Args:
-        depth:     Minimax search depth (higher = stronger but slower)
-        epsilon:   Probability of a random move (0 = fully deterministic)
-        max_moves: Safety limit to prevent infinite games (declared a draw)
+        depth:       Minimax search depth (higher = stronger but slower)
+        temperature: Softmax temperature (τ=0 greedy, higher = more random)
+        max_moves:   Safety limit to prevent infinite games (declared a draw)
 
     Returns:
         Dict containing the game result, total moves, and full state history.
@@ -80,8 +79,8 @@ def generate_synthetic_game(depth: int = 4, epsilon: float = 0.1, max_moves: int
             "turn": board.current_turn
         })
 
-        # AI selects a move (epsilon-greedy: sometimes random for diversity)
-        move = get_best_move(board, depth, epsilon)
+        # AI selects a move (softmax sampling for diversity)
+        move = get_best_move(board, depth, temperature)
 
         if move:
             board.make_move(move)
@@ -112,7 +111,7 @@ def generate_synthetic_game(depth: int = 4, epsilon: float = 0.1, max_moves: int
 
 
 def generate_dataset(num_games: int, output_file: str, depth: int = 4,
-                     epsilon: float = 0.1, progress_callback=None):
+                     temperature: float = 1.0, progress_callback=None):
     """
     Generate a dataset of self-play games and save to a JSON file.
 
@@ -120,15 +119,15 @@ def generate_dataset(num_games: int, output_file: str, depth: int = 4,
         num_games:         Number of games to simulate
         output_file:       Path to write the resulting JSON dataset
         depth:             Minimax search depth per game
-        epsilon:           Randomness level for move selection
+        temperature:       Softmax temperature for move sampling
         progress_callback: Optional function(games_done, total_games) for UI updates
     """
     dataset = []
 
-    print(f"Generating {num_games} synthetic games (Depth: {depth}, Epsilon: {epsilon})...")
+    print(f"Generating {num_games} synthetic games (Depth: {depth}, Temperature: {temperature})...")
 
     for i in range(num_games):
-        game_data = generate_synthetic_game(depth, epsilon)
+        game_data = generate_synthetic_game(depth, temperature)
         dataset.append(game_data)
 
         # Progress logging every 10 games or at completion

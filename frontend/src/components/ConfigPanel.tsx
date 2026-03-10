@@ -4,7 +4,7 @@
  * Left-column panel with two collapsible sections:
  *
  *   1. Data Generation — controls for self-play game generation:
- *      - num_games, search depth, epsilon (randomness)
+ *      - num_games, search depth, temperature (softmax)
  *      - Triggers POST /api/generate in the background
  *
  *   2. Model Training — architecture and optimization hyperparameters:
@@ -21,7 +21,7 @@ import { Settings, Play, Database, ChevronDown, ChevronRight, Square } from 'luc
 export const ConfigPanel = () => {
     const [numGames, setNumGames] = useState(10);
     const [depth, setDepth] = useState(4);
-    const [epsilon, setEpsilon] = useState(0.1);
+    const [temperature, setTemperature] = useState(1.0);
     const [discountFactor, setDiscountFactor] = useState(0.0);
     const [epochs, setEpochs] = useState(20);
     const [lr, setLr] = useState(0.001);
@@ -63,7 +63,7 @@ export const ConfigPanel = () => {
             const res = await fetch('http://localhost:8000/api/generate', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ num_games: numGames, depth, epsilon })
+                body: JSON.stringify({ num_games: numGames, depth, temperature })
             });
             if (!res.ok) {
                 const errData = await res.json();
@@ -167,8 +167,8 @@ export const ConfigPanel = () => {
                         <input type="range" min="1" max="8" value={depth} onChange={(e) => setDepth(Number(e.target.value))} />
                     </div>
                     <div className="input-group">
-                        <label>Epsilon (Randomness) <span>{epsilon}</span></label>
-                        <input type="range" min="0" max="0.5" step="0.05" value={epsilon} onChange={(e) => setEpsilon(Number(e.target.value))} />
+                        <label>Temperature τ <span>{temperature.toFixed(1)}</span></label>
+                        <input type="range" min="0" max="5" step="0.1" value={temperature} onChange={(e) => setTemperature(Number(e.target.value))} />
                     </div>
                     <button className="primary" onClick={handleGenerate} style={{ width: '100%', marginTop: '0.5rem', display: 'flex', justifyContent: 'center', gap: '0.5rem' }}>
                         <Database size={18} /> Generate Data
@@ -197,7 +197,7 @@ export const ConfigPanel = () => {
                     </div>
                     <div className="input-group">
                         <label>Dropout Rate <span>{dropoutRate}</span></label>
-                        <input type="range" min="0" max="0.5" step="0.05" value={dropoutRate} onChange={(e) => setDropoutRate(Number(e.target.value))} />
+                        <input type="range" min="0" max="0.5" step="0.01" value={dropoutRate} onChange={(e) => setDropoutRate(Number(e.target.value))} />
                     </div>
 
                     <h4 style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.5rem', marginTop: '1rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Optimization</h4>
@@ -215,7 +215,7 @@ export const ConfigPanel = () => {
                     </div>
                     <div className="input-group">
                         <label>Label Discount γ <span>{discountFactor.toFixed(2)}</span></label>
-                        <input type="range" min="0" max="1" step="0.05" value={discountFactor} onChange={(e) => setDiscountFactor(Number(e.target.value))} />
+                        <input type="range" min="0" max="1" step="0.01" value={discountFactor} onChange={(e) => setDiscountFactor(Number(e.target.value))} />
                     </div>
 
                     <h4 style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.5rem', marginTop: '1rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Early Stopping</h4>

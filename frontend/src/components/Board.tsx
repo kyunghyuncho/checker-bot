@@ -13,7 +13,7 @@
  *
  * AI inference pipeline:
  *   1. useEffect fires when currentTurn changes and belongs to an AI side
- *   2. POST /api/infer with board state, model_id, and epsilon
+ *   2. POST /api/infer with board state, model_id, and temperature
  *   3. Response contains the best move and CNN win probabilities
  *   4. Move is applied to the grid with a 500ms delay for visibility
  *   5. Turn switches, triggering the next AI's move (if AI vs AI)
@@ -49,7 +49,7 @@ interface BoardProps {
     currentTurn: number;
     blackModelId: string | null;
     whiteModelId: string | null;
-    epsilon: number;
+    temperature: number;
     searchDepth: number;
     isPlaying: boolean;
     setGrid: (grid: number[][]) => void;
@@ -159,7 +159,7 @@ const DroppableSquare = ({ r, c, piece, currentTurn, isHumanTurn }: { r: number,
 // Main Board Component
 // ----------------------------------------------------
 export const Board: React.FC<BoardProps> = ({
-    grid, currentTurn, blackModelId, whiteModelId, epsilon, searchDepth, isPlaying, setGrid, setCurrentTurn, gameOver, setGameOver
+    grid, currentTurn, blackModelId, whiteModelId, temperature, searchDepth, isPlaying, setGrid, setCurrentTurn, gameOver, setGameOver
 }) => {
     const sensors = useSensors(
         useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
@@ -243,7 +243,7 @@ export const Board: React.FC<BoardProps> = ({
                         current_turn: currentTurn,
                         depth: searchDepth,
                         model_id: modelId,
-                        epsilon: epsilon
+                        temperature: temperature
                     })
                 });
 

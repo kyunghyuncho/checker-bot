@@ -8,7 +8,7 @@
  *                   ModelRegistry (model arena with Red/White assignment)
  *
  *   Center column: Interactive Board (drag-and-drop checkers)
- *                   Mode label + epsilon slider
+ *                   Mode label + temperature slider
  *                   Turn indicators (Red / White active)
  *
  *   Right column:  BrainVisualizer (CNN win probability bars)
@@ -17,7 +17,7 @@
  * State managed here:
  *   - boardState / currentTurn: the game grid and whose turn it is
  *   - blackModelId / whiteModelId: which AI model plays each side (null = human)
- *   - epsilon: randomness for AI move selection
+ *   - temperature: softmax temperature for AI move sampling
  *   - cnnProbabilities: latest CNN output for the brain visualizer
  *   - gameOver: winner ID when the game ends (null while active)
  */
@@ -59,7 +59,7 @@ export const Game = () => {
         white_eval: { p_black: number, p_white: number } | null;
     } | null>(null);
     const [gameOver, setGameOver] = useState<number | null>(null);
-    const [epsilon, setEpsilon] = useState(0.0);
+    const [temperature, setTemperature] = useState(0.0);
     const [searchDepth, setSearchDepth] = useState(1);
     const [isPlaying, setIsPlaying] = useState(false);
     const [moveHistory, setMoveHistory] = useState<MaterialSnapshot[]>([]);
@@ -171,8 +171,8 @@ export const Game = () => {
                             <input type="range" min="1" max="8" step="1" value={searchDepth} onChange={(e) => setSearchDepth(Number(e.target.value))} style={{ width: '80px' }} />
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                            <label style={{ whiteSpace: 'nowrap' }}>ε {epsilon.toFixed(2)}</label>
-                            <input type="range" min="0" max="0.3" step="0.01" value={epsilon} onChange={(e) => setEpsilon(Number(e.target.value))} style={{ width: '80px' }} />
+                            <label style={{ whiteSpace: 'nowrap' }}>τ {temperature.toFixed(1)}</label>
+                            <input type="range" min="0" max="5" step="0.1" value={temperature} onChange={(e) => setTemperature(Number(e.target.value))} style={{ width: '80px' }} />
                         </div>
                     </div>
                 </div>
@@ -182,7 +182,7 @@ export const Game = () => {
                     currentTurn={currentTurn}
                     blackModelId={blackModelId}
                     whiteModelId={whiteModelId}
-                    epsilon={epsilon}
+                    temperature={temperature}
                     searchDepth={searchDepth}
                     isPlaying={isPlaying}
                     setGrid={setBoardState}
