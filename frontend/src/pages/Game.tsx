@@ -29,7 +29,7 @@ import { BrainVisualizer } from '../components/BrainVisualizer';
 import { Metrics } from '../components/Metrics';
 import { ModelRegistry } from '../components/ModelRegistry';
 import { GameMonitor } from '../components/GameMonitor';
-import type { MaterialSnapshot } from '../components/GameMonitor';
+import type { MaterialSnapshot, ProbSnapshot } from '../components/GameMonitor';
 
 // The main Dashboard view for playing and training
 export const Game = () => {
@@ -63,6 +63,7 @@ export const Game = () => {
     const [searchDepth, setSearchDepth] = useState(1);
     const [isPlaying, setIsPlaying] = useState(false);
     const [moveHistory, setMoveHistory] = useState<MaterialSnapshot[]>([]);
+    const [probHistory, setProbHistory] = useState<ProbSnapshot[]>([]);
 
     // Track material after every board state change
     useEffect(() => {
@@ -87,6 +88,7 @@ export const Game = () => {
         setGameOver(null);
         setIsPlaying(false); // Stop play on reset
         setMoveHistory([]);  // Clear history on reset
+        setProbHistory([]);  // Clear probability history on reset
     };
 
     const handleModelAssign = (side: 'black' | 'white', modelId: string | null) => {
@@ -115,6 +117,11 @@ export const Game = () => {
                 });
                 const data = await response.json();
                 setDualProbabilities(data);
+
+                // Accumulate probability history for the chart
+                const redEval = data.red_eval ? data.red_eval.p_black - data.red_eval.p_white : null;
+                const whiteEval = data.white_eval ? data.white_eval.p_black - data.white_eval.p_white : null;
+                setProbHistory(prev => [...prev, { redEval, whiteEval }]);
             } catch (err) {
                 console.error("Evaluate Error:", err);
             }
@@ -189,7 +196,7 @@ export const Game = () => {
                     <div className={`status-indicator ${currentTurn === 2 ? 'active' : ''}`} style={{ backgroundColor: 'var(--piece-white)' }} /> White {currentTurn === 2 ? "(Active)" : ""}
                 </div>
 
-                <GameMonitor grid={boardState} currentTurn={currentTurn} moveHistory={moveHistory} />
+                <GameMonitor grid={boardState} currentTurn={currentTurn} moveHistory={moveHistory} probHistory={probHistory} />
             </div>
 
             {/* Right Column: AI Brain Visualization & Rules */}

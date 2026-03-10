@@ -17,10 +17,16 @@ interface MaterialSnapshot {
     whiteScore: number;
 }
 
+interface ProbSnapshot {
+    redEval: number | null;   // Red model's (p_black - p_white), or null if no red model
+    whiteEval: number | null; // White model's (p_black - p_white), or null if no white model
+}
+
 interface GameMonitorProps {
     grid: number[][];
     currentTurn: number;
     moveHistory: MaterialSnapshot[];
+    probHistory: ProbSnapshot[];
 }
 
 /** Count pieces and compute material scores from the grid */
@@ -106,7 +112,44 @@ const MaterialChart: React.FC<{ history: MaterialSnapshot[] }> = ({ history }) =
     );
 };
 
-export const GameMonitor: React.FC<GameMonitorProps> = ({ grid, currentTurn, moveHistory }) => {
+/** Sparkline for CNN probability differences over time */
+const ProbabilityChart: React.FC<{ history: ProbSnapshot[] }> = ({ history }) => {
+    const hasRed = history.some(s => s.redEval !== null);
+    const hasWhite = history.some(s => s.whiteEval !== null);
+    if (history.length < 2 || (!hasRed && !hasWhite)) {
+        return <div style={{ color: 'var(--text-muted)', fontSize: '0.8rem', textAlign: 'center', padding: '0.5rem' }}>Assign models to see CNN evaluation chart</div>;
+    }
+
+    const W = 320, H = 60, PAD = 2;
+
+    const toPoints = (vals: (number | null)[]) => {
+        const filtered = vals.map((v, i) => v !== null ? { x: i, y: v } : null).filter(Boolean) as { x: number; y: number }[];
+        if (filtered.length < 2) return '';
+        const maxAbs = Math.max(1, ...filtered.map(p => Math.abs(p.y)));
+        return filtered.map(p => {
+            const x = PAD + (p.x / (vals.length - 1)) * (W - 2 * PAD);
+            const y = H / 2 - (p.y / maxAbs) * (H / 2 - PAD);
+            return `${x},${y}`;
+        }).join(' ');
+    };
+
+    const redPoints = toPoints(history.map(s => s.redEval));
+    const whitePoints = toPoints(history.map(s => s.whiteEval));
+
+    return (
+        <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{ display: 'block' }}>
+            <line x1={PAD} y1={H / 2} x2={W - PAD} y2={H / 2} stroke="var(--border-color)" strokeWidth="1" strokeDasharray="4,3" />
+            {redPoints && <polyline fill="none" stroke="var(--piece-red)" strokeWidth="2" opacity={0.8} points={redPoints} />}
+            {whitePoints && <polyline fill="none" stroke="var(--text-secondary)" strokeWidth="2" opacity={0.8} points={whitePoints} />}
+            <text x={PAD} y={PAD + 8} fontSize="8" fill="var(--piece-red)" opacity={0.6}>Red AI</text>
+            <text x={PAD + 40} y={PAD + 8} fontSize="8" fill="var(--text-secondary)" opacity={0.6}>White AI</text>
+            <text x={W - PAD} y={PAD + 8} textAnchor="end" fontSize="8" fill="var(--text-muted)" opacity={0.6}>Red favored ↑</text>
+            <text x={W - PAD} y={H - PAD} textAnchor="end" fontSize="8" fill="var(--text-muted)" opacity={0.6}>White favored ↑</text>
+        </svg>
+    );
+};
+
+export const GameMonitor: React.FC<GameMonitorProps> = ({ grid, currentTurn, moveHistory, probHistory }) => {
     const stats = useMemo(() => computeStats(grid), [grid]);
     const legalMoves = useMemo(() => countLegalMoves(grid, currentTurn), [grid, currentTurn]);
     const advantage = stats.redScore - stats.whiteScore;
@@ -149,8 +192,12 @@ export const GameMonitor: React.FC<GameMonitorProps> = ({ grid, currentTurn, mov
             {/* Material balance chart */}
             <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.25rem' }}>Material Balance Over Time</div>
             <MaterialChart history={moveHistory} />
+
+            {/* CNN probability chart */}
+            <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.25rem', marginTop: '0.75rem' }}>CNN Win Probability Over Time</div>
+            <ProbabilityChart history={probHistory} />
         </div>
     );
 };
 
-export type { MaterialSnapshot };
+export type { MaterialSnapshot, ProbSnapshot };
