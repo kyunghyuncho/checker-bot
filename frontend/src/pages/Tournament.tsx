@@ -50,6 +50,26 @@ export const Tournament = () => {
     const [error, setError] = useState('');
     const logRef = useRef<HTMLDivElement>(null);
 
+    // Restore results from sessionStorage on mount
+    useEffect(() => {
+        try {
+            const saved = sessionStorage.getItem('tournament_results');
+            if (saved) {
+                const data = JSON.parse(saved);
+                if (data.rankings) setRankings(data.rankings);
+                if (data.h2h) setH2h(data.h2h);
+                if (data.log) setLog(data.log);
+            }
+        } catch { /* ignore parse errors */ }
+    }, []);
+
+    // Save results to sessionStorage whenever they change
+    useEffect(() => {
+        if (rankings.length > 0) {
+            sessionStorage.setItem('tournament_results', JSON.stringify({ rankings, h2h, log }));
+        }
+    }, [rankings, h2h, log]);
+
     // WebSocket listener for tournament events
     useEffect(() => {
         const ws = new WebSocket('ws://localhost:8000/ws/metrics');
@@ -114,6 +134,7 @@ export const Tournament = () => {
         setLog([]);
         setProgress(null);
         setError('');
+        sessionStorage.removeItem('tournament_results');
     };
 
     // Build unique model list for H2H matrix
