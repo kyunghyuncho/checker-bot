@@ -41,6 +41,7 @@ interface ModelMeta {
     num_conv_layers?: number;
     dropout_rate?: number;
     learning_rate?: number;
+    discount_factor?: number;
     epochs_trained?: number;
     batch_size?: number;
     final_train_loss?: number;
@@ -57,6 +58,7 @@ const ModelTooltip = ({ name, meta }: { name: string; meta?: ModelMeta }) => {
                 <br />Layers: {meta.num_conv_layers ?? '?'} × {meta.hidden_dims ?? '?'}ch
                 <br />Dropout: {meta.dropout_rate ?? '?'}
                 <br />LR: {meta.learning_rate ?? '?'}
+                <br />Discount γ: {meta.discount_factor ?? '0.05'}
                 <br />Epochs: {meta.epochs_trained ?? '?'}
                 <br />Batch: {meta.batch_size ?? '?'}
                 {meta.final_train_loss != null && <><br />Train loss: {meta.final_train_loss}</>}

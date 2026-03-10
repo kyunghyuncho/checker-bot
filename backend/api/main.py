@@ -351,6 +351,7 @@ async def api_train(req: TrainRequest, background_tasks: BackgroundTasks):
                 "dropout_rate": req.dropout_rate,
                 "learning_rate": req.learning_rate,
                 "batch_size": req.batch_size,
+                "discount_factor": req.discount_factor,
             }
 
             # Include final loss values if available
@@ -612,6 +613,7 @@ async def api_tournament(req: TournamentRequest, background_tasks: BackgroundTas
             "num_conv_layers": m.get("num_conv_layers"),
             "dropout_rate": m.get("dropout_rate"),
             "learning_rate": m.get("learning_rate"),
+            "discount_factor": m.get("discount_factor"),
             "epochs_trained": m.get("epochs_trained"),
             "batch_size": m.get("batch_size"),
             "final_train_loss": m.get("final_train_loss"),
