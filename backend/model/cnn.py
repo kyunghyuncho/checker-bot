@@ -1,14 +1,15 @@
 """
-Two-Headed Convolutional Neural Network for Checkers Evaluation
+Two-Headed Residual CNN for Checkers Evaluation
 ================================================================
-This module defines the CNN architecture used to predict win probabilities
-from a checkers board state.
+This module defines the residual CNN architecture used to predict win
+probabilities from a checkers board state.
 
 Architecture overview:
-    1. Shared convolutional backbone: N conv layers (3×3, same-padding) with
-       BatchNorm and ReLU. Processes the 5-channel input into spatial features.
-    2. Head 1 (p_black): Fully-connected layers → Sigmoid → P(Black wins)
-    3. Head 2 (p_white): Fully-connected layers → Sigmoid → P(White wins)
+    1. Input projection: Conv2d(5 → hidden_dims) with BatchNorm + ReLU
+    2. Residual backbone: N residual blocks, each containing:
+       Conv2d → BatchNorm → ReLU → Conv2d → BatchNorm + skip connection → ReLU
+    3. Head 1 (p_black): Fully-connected layers → Sigmoid → P(Black wins)
+    4. Head 2 (p_white): Fully-connected layers → Sigmoid → P(White wins)
 
 Input encoding (5 channels × 8 rows × 8 cols):
     Channel 0: Black pieces       (1.0 where present, 0.0 elsewhere)
@@ -26,14 +27,36 @@ import torch
 import torch.nn as nn
 
 
+class ResidualBlock(nn.Module):
+    """
+    A single residual block: two 3×3 convolutions with a skip connection.
+
+        input → Conv → BN → ReLU → Conv → BN → (+input) → ReLU → output
+    """
+
+    def __init__(self, channels: int):
+        super().__init__()
+        self.block = nn.Sequential(
+            nn.Conv2d(channels, channels, kernel_size=3, padding=1, bias=False),
+            nn.BatchNorm2d(channels),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(channels, channels, kernel_size=3, padding=1, bias=False),
+            nn.BatchNorm2d(channels),
+        )
+        self.relu = nn.ReLU(inplace=True)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return self.relu(self.block(x) + x)
+
+
 class TwoHeadedCNN(nn.Module):
     """
-    Configurable two-headed CNN for board evaluation.
+    Configurable two-headed residual CNN for board evaluation.
 
     Args:
         channels:        Number of input channels (default 5 for the board encoding)
         hidden_dims:     Number of filters per conv layer and implicit feature width
-        num_conv_layers: Number of stacked Conv2d → BatchNorm → ReLU blocks
+        num_conv_layers: Number of residual blocks in the backbone
         dropout_rate:    Dropout probability in the FC head layers (regularization)
     """
 
@@ -41,33 +64,31 @@ class TwoHeadedCNN(nn.Module):
                  num_conv_layers: int = 2, dropout_rate: float = 0.2):
         super(TwoHeadedCNN, self).__init__()
 
-        # ── Shared convolutional backbone ────────────────────────────
-        # Each layer: Conv2d(3×3, same padding) → BatchNorm → ReLU
-        # Same padding preserves the 8×8 spatial dimensions throughout
-        layers = []
-        in_ch = channels
-        for _ in range(num_conv_layers):
-            layers.extend([
-                nn.Conv2d(in_channels=in_ch, out_channels=hidden_dims,
-                          kernel_size=3, padding=1),
-                nn.BatchNorm2d(hidden_dims),
-                nn.ReLU(),
-            ])
-            in_ch = hidden_dims  # All subsequent layers use hidden_dims as input
-        layers.append(nn.Flatten())  # Flatten 8×8×hidden_dims → single vector
-        self.shared_backbone = nn.Sequential(*layers)
+        # ── Input projection: 5 channels → hidden_dims ──────────────
+        self.input_proj = nn.Sequential(
+            nn.Conv2d(channels, hidden_dims, kernel_size=3, padding=1, bias=False),
+            nn.BatchNorm2d(hidden_dims),
+            nn.ReLU(inplace=True),
+        )
+
+        # ── Residual backbone ────────────────────────────────────────
+        # N residual blocks, each with skip connections
+        self.residual_blocks = nn.Sequential(
+            *[ResidualBlock(hidden_dims) for _ in range(num_conv_layers)]
+        )
+
+        self.flatten = nn.Flatten()
 
         # After flatten: 8 × 8 × hidden_dims = 64 * hidden_dims features
         flattened_size = 64 * hidden_dims
 
         # ── Head 1: P(Black wins) ────────────────────────────────────
-        # Linear → ReLU → Dropout → Linear → Sigmoid
         self.head_black_win = nn.Sequential(
             nn.Linear(flattened_size, 128),
             nn.ReLU(),
             nn.Dropout(dropout_rate),
             nn.Linear(128, 1),
-            nn.Sigmoid()  # Output in [0, 1]
+            nn.Sigmoid()
         )
 
         # ── Head 2: P(White wins) ────────────────────────────────────
@@ -89,10 +110,12 @@ class TwoHeadedCNN(nn.Module):
         Returns:
             (p_black, p_white): Tuple of tensors, each shape (batch_size,)
         """
-        features = self.shared_backbone(x)
+        features = self.input_proj(x)
+        features = self.residual_blocks(features)
+        features = self.flatten(features)
 
-        p_black = self.head_black_win(features).squeeze()  # (batch,)
-        p_white = self.head_white_win(features).squeeze()  # (batch,)
+        p_black = self.head_black_win(features).squeeze()
+        p_white = self.head_white_win(features).squeeze()
 
         return p_black, p_white
 

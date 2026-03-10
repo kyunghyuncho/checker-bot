@@ -8,7 +8,7 @@ Built with **PyTorch Lightning** and **FastAPI** on the backend, and **Vite**, *
 
 - **Interactive Checkers Board** — Drag-and-drop gameplay powered by `@dnd-kit`, with full rule enforcement via the Python engine (mandatory jumps, kinging, multi-jumps).
 - **AI Arena Mode** — Assign trained models to play as Red, White, or both. Supports Human vs Human, Human vs AI, and AI vs AI matchups.
-- **AI Opponent** — Minimax search with alpha-beta pruning. Optionally enhanced by a trained CNN evaluation function.
+- **AI Opponent** — Minimax search with alpha-beta pruning, enhanced by a trained residual CNN evaluation function.
 - **Softmax Move Sampling** — Control AI exploration via temperature τ. At τ=0 the AI plays greedily; higher τ favors diverse, stochastic play.
 - **Model Registry** — Train, save, and manage multiple CNN models. Assign any model to either side via the arena panel.
 - **Game Over Detection** — A blurred overlay announces the winner when one side has no legal moves remaining.
@@ -31,7 +31,7 @@ checker-bot/
 │   ├── api/main.py                # FastAPI server + model registry + arena inference
 │   ├── engine/board.py            # Core Checkers engine (rules, move generation, evaluation)
 │   ├── engine/minimax.py          # Minimax + alpha-beta pruning + softmax sampling
-│   ├── model/cnn.py               # Two-headed CNN architecture (5-channel input)
+│   ├── model/cnn.py               # Two-headed residual CNN architecture (5-channel input)
 │   ├── model/lightning_module.py  # PyTorch Lightning training module + dataset
 │   ├── data/generator.py          # Self-play data generation with outcome labeling
 │   └── models/                    # Saved model checkpoints + metadata (auto-created)
