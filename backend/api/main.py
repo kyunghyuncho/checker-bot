@@ -605,6 +605,14 @@ async def websocket_endpoint(websocket: WebSocket):
     """
     await websocket.accept()
     active_websockets.append(websocket)
+    
+    # If training is already happening, let the newly connected client know
+    if is_training:
+        await websocket.send_text(json.dumps({
+            "type": "training_started",
+            "message": "Connected to ongoing training session..."
+        }))
+        
     try:
         while True:
             # Keep the connection alive by waiting for any client messages
