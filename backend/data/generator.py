@@ -42,7 +42,7 @@ def serialize_board_state(board: CheckersBoard) -> List[List[int]]:
     return [row[:] for row in board.grid]
 
 
-def generate_synthetic_game(depth: int = 4, epsilon: float = 0.1, max_moves: int = 200) -> Dict:
+def generate_synthetic_game(depth: int = 4, epsilon: float = 0.1, max_moves: int = 200, discount_factor: float = 0.0) -> Dict:
     """
     Play a complete game of checkers via AI self-play and record the result.
 
@@ -51,9 +51,14 @@ def generate_synthetic_game(depth: int = 4, epsilon: float = 0.1, max_moves: int
     which produces more diverse training data.
 
     Args:
-        depth:     Minimax search depth (higher = stronger but slower)
-        epsilon:   Probability of a random move (0 = fully deterministic)
-        max_moves: Safety limit to prevent infinite games (declared a draw)
+        depth:           Minimax search depth (higher = stronger but slower)
+        epsilon:         Probability of a random move (0 = fully deterministic)
+        max_moves:       Safety limit to prevent infinite games (declared a draw)
+        discount_factor: Exponential discounting factor γ ∈ [0, 1].
+                         For position at distance d from game end:
+                           label = 0.5 + (outcome − 0.5) × (1 − γ)^d
+                         γ=0: no discounting (all positions get full outcome label)
+                         γ=1: only the final position gets the true label
 
     Returns:
         Dict containing the game result, total moves, and full state history.
@@ -91,19 +96,23 @@ def generate_synthetic_game(depth: int = 4, epsilon: float = 0.1, max_moves: int
             winner = 2 if board.current_turn == 1 else 1
             break
 
-    # ── Label all states with the game outcome ───────────────────────
-    # Every board state in the game gets the same label based on who won.
-    # This is "outcome supervision" — the model learns to associate
-    # board patterns with eventual game outcomes.
+    # ── Label all states with discounted game outcome ─────────────────
+    # Outcome: 1.0 = Black won, 0.0 = White won, 0.5 = Draw
     if winner == 1:
-        label = 1.0    # Black won
+        outcome = 1.0
     elif winner == 2:
-        label = 0.0    # White won
+        outcome = 0.0
     else:
-        label = 0.5    # Draw
+        outcome = 0.5
 
-    for state in states:
-        state["label"] = label
+    # Apply exponential discounting toward 0.5 (draw)
+    # label_t = 0.5 + (outcome - 0.5) * (1 - γ)^d
+    # where d = distance from end = (T - 1 - t)
+    T = len(states)
+    for t, state in enumerate(states):
+        d = T - 1 - t  # distance from the final position
+        discount = (1.0 - discount_factor) ** d
+        state["label"] = 0.5 + (outcome - 0.5) * discount
 
     return {
         "result": winner,
@@ -113,7 +122,8 @@ def generate_synthetic_game(depth: int = 4, epsilon: float = 0.1, max_moves: int
 
 
 def generate_dataset(num_games: int, output_file: str, depth: int = 4,
-                     epsilon: float = 0.1, progress_callback=None):
+                     epsilon: float = 0.1, progress_callback=None,
+                     discount_factor: float = 0.0):
     """
     Generate a dataset of self-play games and save to a JSON file.
 
@@ -123,13 +133,14 @@ def generate_dataset(num_games: int, output_file: str, depth: int = 4,
         depth:             Minimax search depth per game
         epsilon:           Randomness level for move selection
         progress_callback: Optional function(games_done, total_games) for UI updates
+        discount_factor:   Exponential discounting factor for labels (0 = no discounting)
     """
     dataset = []
 
-    print(f"Generating {num_games} synthetic games (Depth: {depth}, Epsilon: {epsilon})...")
+    print(f"Generating {num_games} synthetic games (Depth: {depth}, Epsilon: {epsilon}, Discount: {discount_factor})...")
 
     for i in range(num_games):
-        game_data = generate_synthetic_game(depth, epsilon)
+        game_data = generate_synthetic_game(depth, epsilon, discount_factor=discount_factor)
         dataset.append(game_data)
 
         # Progress logging every 10 games or at completion

@@ -22,6 +22,7 @@ export const ConfigPanel = () => {
     const [numGames, setNumGames] = useState(10);
     const [depth, setDepth] = useState(4);
     const [epsilon, setEpsilon] = useState(0.1);
+    const [discountFactor, setDiscountFactor] = useState(0.0);
     const [epochs, setEpochs] = useState(20);
     const [lr, setLr] = useState(0.001);
     const [hiddenDims, setHiddenDims] = useState(64);
@@ -62,7 +63,7 @@ export const ConfigPanel = () => {
             const res = await fetch('http://localhost:8000/api/generate', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ num_games: numGames, depth, epsilon })
+                body: JSON.stringify({ num_games: numGames, depth, epsilon, discount_factor: discountFactor })
             });
             if (!res.ok) {
                 const errData = await res.json();
@@ -167,6 +168,10 @@ export const ConfigPanel = () => {
                     <div className="input-group">
                         <label>Epsilon (Randomness) <span>{epsilon}</span></label>
                         <input type="range" min="0" max="0.5" step="0.05" value={epsilon} onChange={(e) => setEpsilon(Number(e.target.value))} />
+                    </div>
+                    <div className="input-group">
+                        <label>Label Discount γ <span>{discountFactor.toFixed(2)}</span></label>
+                        <input type="range" min="0" max="1" step="0.05" value={discountFactor} onChange={(e) => setDiscountFactor(Number(e.target.value))} />
                     </div>
                     <button className="primary" onClick={handleGenerate} style={{ width: '100%', marginTop: '0.5rem', display: 'flex', justifyContent: 'center', gap: '0.5rem' }}>
                         <Database size={18} /> Generate Data

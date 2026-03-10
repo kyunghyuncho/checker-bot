@@ -111,6 +111,7 @@ class GenerateRequest(BaseModel):
     num_games: int = 10                          # Number of games to simulate
     depth: int = 4                               # Minimax search depth
     epsilon: float = 0.1                         # Probability of random moves
+    discount_factor: float = 0.0                 # Label discounting: 0=none, 1=max
     output_file: str = "backend/data/dataset.json"  # Output JSON path
 
 
@@ -234,7 +235,7 @@ async def api_generate(req: GenerateRequest, background_tasks: BackgroundTasks):
                 )
 
         try:
-            generate_dataset(req.num_games, req.output_file, req.depth, req.epsilon, progress)
+            generate_dataset(req.num_games, req.output_file, req.depth, req.epsilon, progress, discount_factor=req.discount_factor)
             print("Dataset generation complete.")
             # Notify frontend of completion
             for ws in active_websockets:
