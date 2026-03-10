@@ -262,6 +262,7 @@ async def api_generate(req: GenerateRequest, background_tasks: BackgroundTasks):
                 )
 
         try:
+            print(f"Starting background generation of {req.num_games} games...")
             generate_dataset(req.num_games, req.output_file, req.depth, req.temperature, progress)
             print("Dataset generation complete.")
             # Notify frontend of completion
@@ -276,7 +277,11 @@ async def api_generate(req: GenerateRequest, background_tasks: BackgroundTasks):
         except Exception as e:
             print(f"Error generating dataset: {e}")
 
-    background_tasks.add_task(_run_gen)
+    # Launch in a completely separate raw OS thread so we don't block Uvicorn's asyncio worker pool
+    import threading
+    t = threading.Thread(target=_run_gen, daemon=True)
+    t.start()
+    
     return {"message": f"Started generating {req.num_games} games locally."}
 
 
