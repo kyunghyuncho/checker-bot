@@ -9,7 +9,7 @@ Built with **PyTorch Lightning** and **FastAPI** on the backend, and **Vite**, *
 - **Interactive Checkers Board** — Drag-and-drop gameplay powered by `@dnd-kit`, with full rule enforcement via the Python engine (mandatory jumps, kinging, multi-jumps).
 - **AI Arena Mode** — Assign trained models to play as Red, White, or both. Supports Human vs Human, Human vs AI, and AI vs AI matchups.
 - **AI Opponent** — Minimax search with alpha-beta pruning. Optionally enhanced by a trained CNN evaluation function.
-- **Epsilon Slider** — Control AI move randomness (ε 0.00–0.30) for varied AI vs AI games.
+- **Softmax Move Sampling** — Control AI exploration via temperature τ. At τ=0 the AI plays greedily; higher τ favors diverse, stochastic play.
 - **Model Registry** — Train, save, and manage multiple CNN models. Assign any model to either side via the arena panel.
 - **Game Over Detection** — A blurred overlay announces the winner when one side has no legal moves remaining.
 - **CNN Brain Visualizer** — After training, the AI Brain panel displays each assigned model's real-time win probability estimates independently (Red AI's thoughts vs White AI's thoughts).
@@ -30,7 +30,7 @@ checker-bot/
 ├── backend/
 │   ├── api/main.py                # FastAPI server + model registry + arena inference
 │   ├── engine/board.py            # Core Checkers engine (rules, move generation, evaluation)
-│   ├── engine/minimax.py          # Minimax + alpha-beta pruning + epsilon-greedy
+│   ├── engine/minimax.py          # Minimax + alpha-beta pruning + softmax sampling
 │   ├── model/cnn.py               # Two-headed CNN architecture (5-channel input)
 │   ├── model/lightning_module.py  # PyTorch Lightning training module + dataset
 │   ├── data/generator.py          # Self-play data generation with outcome labeling
@@ -110,9 +110,13 @@ When Minimax reaches its search depth limit (e.g., exactly 4 turns into the futu
 * **Hardcoded Heuristic (Fallback):** If no AI model is loaded, the engine simply counts pieces on the board. A regular piece is worth 1.0, a King is worth 1.5, and controlling the center 4 squares is worth an extra 0.5.
 * **The "Brain" (CNN Model):** If a trained neural network is assigned, the board is converted into a PyTorch tensor and fed into the CNN. The CNN outputs two probabilities: `P(Red)` and `P(White)`. The board is then scored mathematically using the difference between these two probabilities, essentially letting the neural network "feel" which side is winning based on its trained experience, rather than just blindly counting pieces.
 
-### 4. Epsilon-Greedy Randomness
-To prevent the exact same game from playing out repeatedly, the AI employs an **Epsilon (ε)** parameter. 
-Before executing an optimal Minimax search, the engine rolls a multi-sided die. If the roll is less than ε (for example, a 5% chance if ε=0.05), the AI completely ignores the search tree and simply picks a legal move at random. This allows for vast variety in AI vs AI matchups and generates diverse, non-repetitive data during self-play data generation.
+### 4. Softmax (Boltzmann) Sampling
+To produce diverse games and prevent repetitive play, the AI uses **softmax sampling** over its minimax-evaluated moves. Instead of always picking the single best move, each legal move's minimax score is converted into a probability via the softmax function, controlled by a **temperature (τ)** parameter:
+- **τ = 0**: Purely greedy — always the highest-scoring move.
+- **τ = 1**: Balanced exploration — good moves are likely but weaker alternatives still occur.
+- **τ → ∞**: Uniform random — all legal moves become equally likely.
+
+This is a major improvement over the previous epsilon-greedy strategy, which randomly selected a *completely random* move with probability ε. Softmax sampling ensures that even when exploring, the AI favors *reasonable* alternatives rather than catastrophic blunders.
 
 ## API Endpoints
 
