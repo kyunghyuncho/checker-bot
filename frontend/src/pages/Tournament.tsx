@@ -39,6 +39,7 @@ export const Tournament = () => {
     const [numGames, setNumGames] = useState(20);
     const [depth, setDepth] = useState(2);
     const [temperature, setTemperature] = useState(1.0);
+    const [maxMoves, setMaxMoves] = useState(200);
     const [running, setRunning] = useState(false);
     const [progress, setProgress] = useState<ProgressUpdate | null>(null);
     const [rankings, setRankings] = useState<RankingEntry[]>([]);
@@ -84,7 +85,7 @@ export const Tournament = () => {
             const res = await fetch('http://localhost:8000/api/tournament', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ num_games: numGames, depth, temperature })
+                body: JSON.stringify({ num_games: numGames, depth, temperature, max_moves: maxMoves })
             });
             if (!res.ok) {
                 const errData = await res.json();
@@ -125,6 +126,10 @@ export const Tournament = () => {
                 <div className="input-group">
                     <label>Temperature τ <span>{temperature.toFixed(1)}</span></label>
                     <input type="range" min="0" max="5" step="0.1" value={temperature} onChange={(e) => setTemperature(Number(e.target.value))} />
+                </div>
+                <div className="input-group">
+                    <label>Max Moves <span>{maxMoves}</span></label>
+                    <input type="range" min="50" max="500" step="50" value={maxMoves} onChange={(e) => setMaxMoves(Number(e.target.value))} />
                 </div>
 
                 <button

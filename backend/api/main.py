@@ -587,6 +587,7 @@ class TournamentRequest(BaseModel):
     num_games: int = 20                   # Total number of games to play
     depth: int = 2                        # Minimax search depth per move
     temperature: float = 1.0              # Softmax temperature for move sampling
+    max_moves: int = 200                  # Max moves per game (draw if exceeded)
 
 
 @app.post("/api/tournament")
@@ -625,14 +626,13 @@ async def api_tournament(req: TournamentRequest, background_tasks: BackgroundTas
             # Play a game
             board = CheckersBoard()
             move_count = 0
-            max_moves = 200
             winner = None
 
             while True:
                 winner = board.check_game_over()
                 if winner is not None:
                     break
-                if move_count > max_moves:
+                if move_count > req.max_moves:
                     winner = 0
                     break
 
