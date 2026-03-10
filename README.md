@@ -84,6 +84,31 @@ Navigate to the localhost port shown by `npm run dev` to interact with the appli
 - **Kinging**: Reaching the far edge crowns a piece as a King. Kings can move diagonally in both directions. Kinging ends the turn.
 - **Winning**: Capture all opponent pieces, or leave them with no legal moves.
 
+## Minimax AI Engine
+
+The project powers its AI bots using a pure **Minimax Search Algorithm** enhanced by **Alpha-Beta Pruning**, optionally guided by the CNN.
+
+### 1. The Game Tree Search
+Minimax is a decision-making algorithm that looks ahead into the future of the game by building a "game tree." 
+- It simulates every possible legal move the current player can make.
+- Then, for each of those moves, it simulates every possible response the opponent can make.
+- It repeats this alternating process up to a strict **Search Depth** limit (e.g., Depth 4 means looking 4 full turns into the future).
+
+The algorithm assumes both players are playing perfectly. The AI's goal is to **maximize** its own score, while assuming the opponent will always make the move that **minimizes** the AI's score. It works backward from the deepest nodes of the tree to pick the branch that guarantees the best possible outcome.
+
+### 2. Alpha-Beta Pruning
+Because the number of possible board states explodes exponentially with every step forward (the "branching factor"), looking even a few turns ahead can require millions of simulations.
+**Alpha-Beta Pruning** drastically speeds up Minimax by abandoning branches of the tree that are mathematically proven to be worse than a move previously examined. If the AI finds a move that gives it +5 points, and while checking a different branch it sees the opponent can force a move that leaves the AI with -2 points, it instantly stops calculating that entire branch.
+
+### 3. Board Evaluation (The Leaf Nodes)
+When Minimax reaches its search depth limit (e.g., exactly 4 turns into the future), it can't simulate anymore. It must look at the board state and guess who is winning. It assigns a number to the board (positive = Red winning, negative = White winning). The AI supports two ways of scoring these "leaf nodes":
+* **Hardcoded Heuristic (Fallback):** If no AI model is loaded, the engine simply counts pieces on the board. A regular piece is worth 1.0, a King is worth 1.5, and controlling the center 4 squares is worth an extra 0.5.
+* **The "Brain" (CNN Model):** If a trained neural network is assigned, the board is converted into a PyTorch tensor and fed into the CNN. The CNN outputs two probabilities: `P(Red)` and `P(White)`. The board is then scored mathematically using the difference between these two probabilities, essentially letting the neural network "feel" which side is winning based on its trained experience, rather than just blindly counting pieces.
+
+### 4. Epsilon-Greedy Randomness
+To prevent the exact same game from playing out repeatedly, the AI employs an **Epsilon (ε)** parameter. 
+Before executing an optimal Minimax search, the engine rolls a multi-sided die. If the roll is less than ε (for example, a 5% chance if ε=0.05), the AI completely ignores the search tree and simply picks a legal move at random. This allows for vast variety in AI vs AI matchups and generates diverse, non-repetitive data during self-play data generation.
+
 ## API Endpoints
 
 | Method | Endpoint              | Description                                      |
