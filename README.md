@@ -12,10 +12,14 @@ Built with **PyTorch Lightning** and **FastAPI** on the backend, and **Vite**, *
 - **Epsilon Slider** — Control AI move randomness (ε 0.00–0.30) for varied AI vs AI games.
 - **Model Registry** — Train, save, and manage multiple CNN models. Assign any model to either side via the arena panel.
 - **Game Over Detection** — A blurred overlay announces the winner when one side has no legal moves remaining.
-- **CNN Brain Visualizer** — After training, the AI Brain panel displays the network's real-time win probability estimates for both sides.
+- **CNN Brain Visualizer** — After training, the AI Brain panel displays each assigned model's real-time win probability estimates independently (Red AI's thoughts vs White AI's thoughts).
 - **Data Generation** — Self-play engine generates labeled training datasets (board state → game outcome).
+- **Exponential Label Discounting** — Configurable discount factor (γ) that smooths training labels: early-game positions are labeled closer to 0.5 (uncertain), while late-game positions retain the true outcome. This dramatically improves CNN training quality.
 - **Model Training** — Train a two-headed CNN via PyTorch Lightning, with live loss charts (train + validation) streamed over WebSocket.
+- **Stop Training** — Gracefully interrupt an ongoing training run at any time. The model saves its current progress and the UI returns to idle.
 - **Early Stopping** — Configurable validation split and patience for early stopping during training.
+- **Game Monitor** — Real-time statistics panel below the board showing piece counts, material advantage, legal move count, and two sparkline charts: material balance and CNN win probability over time.
+- **Configurable Search Depth** — Adjust the minimax search depth (1–8) for interactive play.
 - **Data Inspector** — Browse generated game data move-by-move with an interactive board viewer.
 - **Collapsible Panels** — Data generation and training controls collapse to save space.
 
@@ -37,8 +41,9 @@ checker-bot/
 │   │   └── DataInspector.tsx      # Dataset viewer page
 │   ├── src/components/
 │   │   ├── Board.tsx              # Interactive drag-and-drop board (DnD Kit)
-│   │   ├── BrainVisualizer.tsx    # CNN win probability display
+│   │   ├── BrainVisualizer.tsx    # Dual CNN win probability display
 │   │   ├── ConfigPanel.tsx        # Collapsible data gen & training controls
+│   │   ├── GameMonitor.tsx        # Real-time game stats & sparkline charts
 │   │   ├── Metrics.tsx            # Live training loss chart (Recharts)
 │   │   └── ModelRegistry.tsx      # Model arena panel with Red/White assignment
 │   └── src/index.css              # Design system & global styles
@@ -115,12 +120,14 @@ Before executing an optimal Minimax search, the engine rolls a multi-sided die. 
 |--------|-----------------------|--------------------------------------------------|
 | POST   | `/api/generate`       | Generate self-play training data                 |
 | POST   | `/api/train`          | Start CNN training with PyTorch Lightning         |
+| POST   | `/api/train/stop`     | Gracefully stop an ongoing training run           |
 | GET    | `/api/dataset`        | Retrieve generated dataset for the Data Inspector |
 | POST   | `/api/validate_move`  | Validate a human move against the engine rules    |
-| POST   | `/api/infer`          | Get AI's best move + CNN probabilities            |
+| POST   | `/api/infer`          | Get AI's best move for the current board          |
+| POST   | `/api/evaluate`       | Get both models' win probabilities for a board    |
 | GET    | `/api/models`         | List all saved models with metadata               |
 | DELETE | `/api/models/{id}`    | Delete a saved model                             |
-| WS     | `/ws/metrics`         | Stream training loss metrics in real-time         |
+| WS     | `/ws/metrics`         | Stream training loss & status in real-time        |
 
 ## Documentation
 
