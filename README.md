@@ -120,6 +120,23 @@ To produce diverse games and prevent repetitive play, the AI uses **softmax samp
 
 This is a major improvement over the previous epsilon-greedy strategy, which randomly selected a *completely random* move with probability ε. Softmax sampling ensures that even when exploring, the AI favors *reasonable* alternatives rather than catastrophic blunders.
 
+### 5. AI Tournament & Elo Ratings (Bradley-Terry Model)
+When running an **AI Tournament**, the system pits models against each other in random pairings. To determine who is truly the best, we calculate Elo ratings for every participant based on the tournament results.
+
+Instead of traditional sequential Elo updates (which are dependent on match order), the server calculates ratings by iteratively solving the **Bradley-Terry (BT) model**.
+The BT model assumes the probability of model $i$ beating model $j$ is defined by their innate "skills" $s_i$ and $s_j$:
+$$P(i \text{ beats } j) = \frac{s_i}{s_i + s_j}$$
+
+To solve for these skills given a matrix of win/loss outcomes, we use Minorize-Maximization (MM) or iterative proportional fitting:
+1. Initialize all skills $s_i = 1.0$.
+2. For each model $i$, iterate:
+   $$s_i^{(new)} = \frac{W_i}{\sum_{j \neq i} \frac{N_{ij}}{s_i + s_j}}$$
+   *(Where $W_i$ is total wins for model $i$, and $N_{ij}$ is total games between $i$ and $j$. Draws count as 0.5 wins for both.)*
+3. Repeat step 2 until the skills converge.
+4. Convert those abstract skills into standard Elo ratings: $\text{Elo}_i = 400 \log_{10}(s_i) + 1200$.
+
+This mathematically robust approach guarantees that the final leaderboard accurately reflects the true relative strengths of the models globally.
+
 ## API Endpoints
 
 | Method | Endpoint              | Description                                      |
