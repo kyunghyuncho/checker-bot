@@ -30,7 +30,8 @@ export const DataInspector = () => {
     useEffect(() => {
         const fetchDataset = async () => {
             try {
-                const res = await fetch('http://localhost:8000/api/dataset');
+                // Add a cache-buster to prevent the browser from serving a stale empty array
+                const res = await fetch(`http://localhost:8000/api/dataset?t=${Date.now()}`);
                 if (!res.ok) throw new Error('Failed to fetch dataset');
                 const data = await res.json();
                 setDataset(data.games || []);
