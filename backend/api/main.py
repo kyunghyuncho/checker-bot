@@ -438,6 +438,8 @@ async def api_train_stop():
 
 # ── Dataset Inspection ───────────────────────────────────────────────
 
+from fastapi.responses import FileResponse
+
 @app.get("/api/dataset")
 async def api_dataset(file_path: str = "backend/data/dataset.json"):
     """
@@ -447,12 +449,7 @@ async def api_dataset(file_path: str = "backend/data/dataset.json"):
     """
     if not os.path.exists(file_path):
         return {"games": []}
-    try:
-        with open(file_path, "r") as f:
-            data = json.load(f)
-        return {"games": data}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    return FileResponse(file_path, media_type="application/json")
 
 
 # ── Move Validation ──────────────────────────────────────────────────

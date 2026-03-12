@@ -34,7 +34,14 @@ export const DataInspector = () => {
                 const res = await fetch(`http://localhost:8000/api/dataset?t=${Date.now()}`);
                 if (!res.ok) throw new Error('Failed to fetch dataset');
                 const data = await res.json();
-                setDataset(data.games || []);
+
+                // If the backend streams the file directly, it's a giant JSON array.
+                // If the file doesn't exist, it returns {"games": []}.
+                if (Array.isArray(data)) {
+                    setDataset(data);
+                } else {
+                    setDataset(data.games || []);
+                }
             } catch (err: any) {
                 setError(err.message);
             } finally {
